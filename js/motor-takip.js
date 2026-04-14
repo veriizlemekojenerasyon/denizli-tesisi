@@ -1,12 +1,51 @@
 // Motor Takip JavaScript Fonksiyonları
 
+// Yetki kontrolü fonksiyonu
+function checkAdminAccess() {
+    const currentUser = localStorage.getItem('currentUser');
+    if (!currentUser) {
+        showAccessDenied('Oturum bulunamadı');
+        return false;
+    }
+    
+    try {
+        const user = JSON.parse(currentUser);
+        if (user.role !== 'admin') {
+            showAccessDenied('Bu sayfaya sadece admin rolündeki kullanıcılar erişebilir');
+            return false;
+        }
+        return true;
+    } catch (e) {
+        showAccessDenied('Oturum hatası');
+        return false;
+    }
+}
+
+// Erişim engelleme ekranı
+function showAccessDenied(message) {
+    document.body.innerHTML = `
+        <div class="container">
+            <div class="lock-screen">
+                <h2>🚫 Erişim Engellendi</h2>
+                <p>${message}</p>
+                <p><a href="index.html">Ana Sayfaya Dön</a></p>
+            </div>
+        </div>
+    `;
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    // Yetki kontrolü yap
+    if (!checkAdminAccess()) {
+        return;
+    }
+    
     // Sayfa yüklendiğinde çalışacak fonksiyonlar
     initializeMotorTracking();
     updateDateTime();
     setInterval(updateDateTime, 1000);
     
-    console.log('Motor Takip sayfası yüklendi');
+    console.log('Motor Takip sayfası yüklendi (Admin erişimi)');
 });
 
 // Tarih ve Saat Güncelleme
@@ -827,7 +866,11 @@ async function kaydetTumunu() {
         return;
     }
     
-    // Operatör alanı kaldırıldı - otomatik "Sistem" atanır
+    const operatorSelect = document.getElementById('operator');
+    if (!operatorSelect || !operatorSelect.value) {
+        showNotification('error', 'Hata', 'Lütfen operatör seçin.');
+        return;
+    }
     
     // En az bir fotoğraf eklenmiş mi kontrol et
     const fotoSayisi = Object.values(fotografVerileri).filter(f => f !== null).length;
@@ -837,6 +880,11 @@ async function kaydetTumunu() {
     }
     
     showNotification('info', 'Kaydediliyor', 'Veriler kaydediliyor, lütfen bekleyin...');
+    
+    const tarih = document.getElementById('tracking-date').value;
+    const saat = document.getElementById('tracking-time').value;
+    const vardiya = document.getElementById('shift').value;
+    const operator = operatorSelect.value;
     
     try {
         // Her kontrol tipi için ayrı kayıt yap
