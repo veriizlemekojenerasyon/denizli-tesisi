@@ -1,6 +1,32 @@
 // Kojen Enerji Veri JavaScript - Google Sheets Entegrasyonu
-document.addEventListener('DOMContentLoaded', async function() {
-    // Motor seçim butonları
+document.addEventListener('DOMContentLoaded', function() {
+    // Mobil Menü Fonksiyonları
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('overlay');
+    
+    if (menuToggle && sidebar && overlay) {
+        menuToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        });
+        
+        overlay.addEventListener('click', function() {
+            sidebar.classList.remove('active');
+            overlay.classList.remove('active');
+        });
+        
+        // Sidebar menü linklerine tıklandığında menüyü kapat
+        const menuLinks = document.querySelectorAll('.menu-link');
+        menuLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                sidebar.classList.remove('active');
+                overlay.classList.remove('active');
+            });
+        });
+    }
+    
+    // Google Apps Script URLbutonları
     const motorButtons = document.querySelectorAll('.motor-btn');
     let selectedMotor = 'GM-1';
     let isLocked = false;
