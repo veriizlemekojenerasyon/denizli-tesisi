@@ -363,7 +363,7 @@
         (function checkAdmin() {
             const logged = localStorage.getItem('loggedInUser');
             if (!logged) {
-                window.location.href = 'giris.html';
+                window.location.href = 'index.html';
                 return;
             }
             try {
@@ -373,7 +373,7 @@
                     return;
                 }
             } catch (e) {
-                window.location.href = 'giris.html';
+                window.location.href = 'index.html';
             }
         })();
     </script>

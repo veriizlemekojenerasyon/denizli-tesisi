@@ -47,7 +47,7 @@ function checkAuth() {
 
 function showLockScreen(type) {
     const messages = {
-        giris: { title: '🔒 Giris Gerekli', text: 'Lutfen giris.html sayfasindan giris yapin.' },
+        giris: { title: '🔒 Giris Gerekli', text: 'Lutfen index.html sayfasindan giris yapin.' },
         yetki: { title: '🚫 Yetkisiz Erisim', text: 'Bu sayfa sadece admin kullanicilar icindir.' },
         hata: { title: '⚠️ Oturum Hatasi', text: 'Oturumunuz sonlandi. Lutfen tekrar giris yapin.' }
     };
@@ -58,7 +58,7 @@ function showLockScreen(type) {
             <div class="lock-screen">
                 <h2>${msg.title}</h2>
                 <p>${msg.text}</p>
-                <p><a href="giris.html">Giris Sayfasina Git</a></p>
+                <p><a href="index.html">Ana Sayfaya Git</a></p>
             </div>
         </div>`;
 }
