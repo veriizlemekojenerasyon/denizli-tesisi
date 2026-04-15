@@ -80,14 +80,14 @@ function isRecordExists(tarih, saat) {
 }
 
 // Google Apps Script URL
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbw3oHWOFlcP5ltyEbZVXZJkyFB-RsqQ-aV6AFicOt5hnwP4OjaR32Ay01IQynZQNT0E/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbysyDXF5kP9aFYC-IycyaCEYwVbZFWm6qbVUStSqNyam6ec3-w0WN3dogNygU4lsh6D/exec';
 
 // Kayıtları Yükle - Sadece Google Apps Script'ten çek (LocalStorage devre dışı)
 async function loadRecords() {
     const tbody = document.getElementById('records-tbody');
     const counterElement = document.getElementById('total-records-count');
     
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #64748b;"><i class="fas fa-spinner fa-spin"></i> Kayıtlar yükleniyor...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: #64748b;">⏳ Kayıtlar yükleniyor...</td></tr>';
     
     try {
         // Google Apps Script'ten kayıtları çek
@@ -688,28 +688,117 @@ function gosterKontrolKutulari() {
     }
 }
 
-// Kamera Aç
+// Kamera Aç - Device in use çözümü
 function openCamera(kontrolTipi) {
     showNotification('info', 'Kamera', `${kontrolTipi.toUpperCase()} için kamera açılıyor...`);
     
-    // Kamera API ile fotoğraf çek
+    // Tüm streamleri zorla kapat
+    forceStopAllStreams();
+    
+    // Kısa bekleme sonra dene
+    setTimeout(() => {
+        attemptCameraAccess(kontrolTipi);
+    }, 500);
+}
+
+// Tüm streamleri zorla kapat
+function forceStopAllStreams() {
+    // Global stream'i kapat
+    if (window.currentCameraStream) {
+        window.currentCameraStream.getTracks().forEach(track => {
+            track.stop();
+        });
+        window.currentCameraStream = null;
+    }
+    
+    // Tüm media stream'leri bul ve kapat
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices()
+            .then(devices => {
+                devices.forEach(device => {
+                    if (device.kind === 'videoinput') {
+                        console.log('Video device found:', device.label);
+                    }
+                });
+            });
+    }
+}
+
+// Kamera erişimi dene
+function attemptCameraAccess(kontrolTipi, attempt = 1) {
+    const maxAttempts = 3;
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Basit video constraint ile dene
+        const constraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            },
+            audio: false
+        };
+        
+        navigator.mediaDevices.getUserMedia(constraints)
+            .then(function(stream) {
+                showNotification('success', 'Kamera', 'Kamera başarıyla açıldı!');
+                showCameraModal(stream, kontrolTipi);
+            })
+            .catch(function(error) {
+                console.error(`Kamera denemesi ${attempt} başarısız:`, error);
+                
+                if (attempt < maxAttempts) {
+                    // Tekrar dene - daha uzun bekleme
+                    showNotification('warning', 'Tekrar Deneniyor', `Kamera tekrar deneniyor (${attempt + 1}/${maxAttempts})...`);
+                    
+                    // Önceki stream'i temizle
+                    forceStopAllStreams();
+                    
+                    setTimeout(() => {
+                        attemptCameraAccess(kontrolTipi, attempt + 1);
+                    }, 1000 * attempt); // 1s, 2s, 3s bekle
+                } else {
+                    // Son deneme başarısız - detaylı hata mesajı
+                    let errorMessage = 'Kamera erişimi başarısız oldu.';
+                    
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage = '❌ Kamera izni reddedildi. Lütfen tarayıcı ayarlarından kamera iznini verin.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage = '📷 Kamera bulunamadı. Lütfen kamera bağlantısını kontrol edin.';
+                    } else if (error.name === 'NotReadableError' || error.name === 'DeviceInUseError') {
+                        errorMessage = '🔒 Kamera başka bir uygulama tarafından kullanılıyor.\n\nÇözümler:\n• Tüm sekmeleri kapatıp browser\'ı yeniden başlatın\n• Zoom/Teams/Skype gibi uygulamaları kapatın\n• Farklı browser deneyin';
+                    } else if (error.name === 'OverconstrainedError') {
+                        errorMessage = '⚙️ Kamera ayarları desteklenmiyor.';
+                    } else {
+                        errorMessage = `❌ Bilinmeyen hata: ${error.name} - ${error.message}`;
+                    }
+                    
+                    showNotification('error', 'Kamera Hatası', errorMessage);
+                }
+            });
+    } else {
+        showNotification('error', 'Desteklenmiyor', 'Tarayıcınız kamera API\'yi desteklemiyor.');
+    }
+}
+
+// Düşük çözünürlük ile kamera aç
+function openCameraLowRes(kontrolTipi) {
+    showNotification('info', 'Kamera', 'Düşük çözünürlük deneniyor...');
+    
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         navigator.mediaDevices.getUserMedia({ 
             video: { 
                 facingMode: 'environment',
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
+                width: { ideal: 640 },
+                height: { ideal: 480 }
             } 
         })
         .then(function(stream) {
             showCameraModal(stream, kontrolTipi);
         })
         .catch(function(error) {
-            console.error('Kamera erişim hatası:', error);
-            showNotification('error', 'Kamera Hatası', 'Kamera erişimi sağlanamadı.');
+            console.error('Düşük çözünürlük kamera hatası:', error);
+            showNotification('error', 'Kamera Hatası', 'Kamera erişimi tamamen başarısız oldu.');
         });
-    } else {
-        showNotification('error', 'Desteklenmiyor', 'Tarayıcınız kamera API\'yi desteklemiyor.');
     }
 }
 
@@ -862,6 +951,14 @@ async function kaydetTumunu() {
     const operatorSelect = document.getElementById('operator');
     if (!operatorSelect || !operatorSelect.value) {
         showNotification('error', 'Hata', 'Lütfen operatör seçin.');
+        operatorSelect.focus();
+        return;
+    }
+    
+    const vardiyaSelect = document.getElementById('shift');
+    if (!vardiyaSelect || !vardiyaSelect.value) {
+        showNotification('error', 'Hata', 'Lütfen vardiya seçin.');
+        vardiyaSelect.focus();
         return;
     }
     

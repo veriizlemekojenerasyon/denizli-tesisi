@@ -212,13 +212,13 @@
             <div class="notification-header">
                 <h3>Bildirimler</h3>
                 <button class="close-modal" id="close-notifications">
-                    <i class="fas fa-times"></i>
+                    ✖️
                 </button>
             </div>
             <div class="notification-list">
                 <div class="notification-item unread">
                     <div class="notification-icon">
-                        <i class="fas fa-exclamation-triangle"></i>
+                        ⚠️
                     </div>
                     <div class="notification-text">
                         <h4>GM-1 Motor Bakım Zamanı</h4>
@@ -228,7 +228,7 @@
                 </div>
                 <div class="notification-item unread">
                     <div class="notification-icon">
-                        <i class="fas fa-temperature-high"></i>
+                        🌡️
                     </div>
                     <div class="notification-text">
                         <h4>Yüksek Sıcaklık Uyarısı</h4>
@@ -238,7 +238,7 @@
                 </div>
                 <div class="notification-item unread">
                     <div class="notification-icon">
-                        <i class="fas fa-chart-line"></i>
+                        📊
                     </div>
                     <div class="notification-text">
                         <h4>Günlük Rapor Hazır</h4>
@@ -252,7 +252,7 @@
 
     <script>
         // Fotoğraf için Google Apps Script URL
-        const FOTO_GAS_URL = 'https://script.google.com/macros/s/AKfycbw3oHWOFlcP5ltyEbZVXZJkyFB-RsqQ-aV6AFicOt5hnwP4OjaR32Ay01IQynZQNT0E/exec';
+        const FOTO_GAS_URL = 'https://script.google.com/macros/s/AKfycbysyDXF5kP9aFYC-IycyaCEYwVbZFWm6qbVUStSqNyam6ec3-w0WN3dogNygU4lsh6D/exec';
         
         // Sayfa yüklendiğinde otomatik tarih ata
         document.addEventListener('DOMContentLoaded', function() {
@@ -376,6 +376,24 @@
             const shift = document.getElementById('shift')?.value || '';
             const trackingDate = document.getElementById('tracking-date')?.value || '';
             const trackingTime = document.getElementById('tracking-time')?.value || '';
+            
+            // 🔒 ZORUNLU ALAN KONTROLÜ
+            if (!motor) {
+                alert('⚠️ Lütfen önce motor seçin (GM-1, GM-2 veya GM-3)!');
+                return;
+            }
+            
+            if (!operator) {
+                alert('⚠️ Lütfen operatör seçin!');
+                document.getElementById('operator').focus();
+                return;
+            }
+            
+            if (!shift) {
+                alert('⚠️ Lütfen vardiya seçin!');
+                document.getElementById('shift').focus();
+                return;
+            }
             
             // TR formatına çevir (DD.MM.YYYY)
             const [year, month, day] = trackingDate.split('-');
