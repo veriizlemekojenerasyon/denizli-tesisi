@@ -1,40 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgisini güncelle
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-        }
-    }
-    
-    // Mobil Menü Fonksiyonları
-    const menuToggle = document.getElementById('menuToggle');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('overlay');
-    
-    if (menuToggle && sidebar && overlay) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-        });
-        
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-        
-        // Sidebar menü linklerine tıklandığında menüyü kapat
-        const menuLinks = document.querySelectorAll('.menu-link');
-        menuLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-            });
-        });
-    }
-    
     // Vardiya Google Apps Script URL
     const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2NzLeBDcrZ9T-VoyqrK1J07zN4UlXm-WMrKkMv0AP_puG-0AMzQhNqnQ92D1zHWSp/exec';
     
@@ -63,12 +27,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Vardiya seçicisine otomatik değeri ata (saate göre)
     function setVardiyaByHour() {
-        // Elementin varlığını kontrol et
-        if (!vardiyaSelect) {
-            console.log('Vardiya select elementi bulunamadı!');
-            return;
-        }
-        
         const now = new Date();
         const currentHour = now.getHours();
         
@@ -91,19 +49,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('Vardiya değeri:', vardiyaSelect.value);
         
-        // Değerin doğru ayarlanıp ayarlanmadığını kontrol et
-        if (vardiyaSelect.value === '') {
-            console.log('UYARI: Vardiya değeri ayarlanamadı!');
-        } else {
-            console.log('BAŞARILI: Vardiya değeri ayarlandı:', vardiyaSelect.value);
-        }
-        
         // Vardiya değiştiğinde yardımcı operatör bölümünü kontrol et
         yardimciOperatorKontrolu();
     }
-    
-    // Elementler yüklendikten sonra vardiya seçimini otomatik yap
-    setVardiyaByHour();
+    setVardiyaByHour(); // Fonksiyonu sayfa yüklendikten sonra çağır
 
     // Vardiya başlat - Google Sheets
     kaydetBtn.addEventListener('click', async function() {
@@ -217,8 +166,6 @@ document.addEventListener('DOMContentLoaded', function() {
     vardiyaBitirBtn.addEventListener('click', async function() {
         if (confirm('Vardiya bitirilsin mi?')) {
             const mevcutVardiya = localStorage.getItem('mevcutVardiya');
-            console.log('Vardiya bitir - Mevcut vardiya:', mevcutVardiya);
-            
             if (mevcutVardiya) {
                 const vardiya = JSON.parse(mevcutVardiya);
                 
@@ -235,11 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const url = new URL(VARDIYA_APPS_SCRIPT_URL);
                     url.searchParams.append('action', 'endVardiya');
                     url.searchParams.append('tarih', formattedTarih);
-                    // localStorage'daki vardiya bilgisinden vardiya değerini al
-                    const vardiyaDegeri = vardiya.vardiyaAdi.includes('16:00') ? '16-24' : 
-                                       vardiya.vardiyaAdi.includes('08:00') ? '08-16' : '24-08';
-                    url.searchParams.append('vardiya', vardiyaDegeri);
-                    console.log('Vardiya bitir API - Tarih:', formattedTarih, 'Vardiya:', vardiyaDegeri);
+                    url.searchParams.append('vardiya', vardiyaSelect.value);
                     
                     const response = await fetch(url);
                     const result = await response.json();
@@ -263,9 +206,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     vardiyaBitirBtn.textContent = 'VARDİYAYI BİTİR';
                     vardiyaBitirBtn.disabled = false;
                 }
-            } else {
-                console.log('Vardiya bitir - Aktif vardiya bulunamadı!');
-                alert('Hata: Aktif vardiya kaydı bulunamadı!\n\nLütfen önce vardiya başlatın.');
             }
         }
     });
@@ -502,24 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         if (!mevcutVardiya && tumIslemler.length === 0) {
-            html = `
-                <div class="bos-mesaj">
-                    <h3>📋 Henüz Vardiya Kaydı Bulunamadı</h3>
-                    <p>İşlem detaylarını görmek için öncelikle vardiya başlatmanız gerekmektedir.</p>
-                    <div class="oneri-listesi">
-                        <p><strong>Yapmanız gerekenler:</strong></p>
-                        <ol>
-                            <li>Tarih seçin</li>
-                            <li>Vardiya seçin (08-16, 16-24, 24-08)</li>
-                            <li>Personel seçin</li>
-                            <li>"Vardiya Başlat" butonuna tıklayın</li>
-                        </ol>
-                    </div>
-                    <button class="modal-kapat-btn" onclick="this.closest('.islem-detaylari-modal').remove()">
-                        Anladım, Kapat
-                    </button>
-                </div>
-            `;
+            html = '<div class="bos-mesaj">Henüz hiç vardiya kaydı bulunamadı.</div>';
         }
         
         return html;
@@ -576,8 +499,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Mevcut vardiya bilgisi (localStorage'dan)
     function mevcutVardiyaBilgisi() {
         const mevcutVardiya = localStorage.getItem('mevcutVardiya');
-        console.log('mevcutVardiyaBilgisi - Mevcut vardiya:', mevcutVardiya);
-        
         if (mevcutVardiya) {
             const vardiya = JSON.parse(mevcutVardiya);
             const mevcutVardiyaDiv = document.getElementById('mevcutVardiya');

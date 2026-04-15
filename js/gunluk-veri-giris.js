@@ -1,14 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgisini güncelle
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-        }
-    }
-    
     // Tarih seçicisine otomatik bugünün tarihini atama
     const tarihInput = document.getElementById('TARIH');
     

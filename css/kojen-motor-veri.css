@@ -768,106 +768,44 @@ body {
 }
 
 @media (max-width: 768px) {
-    .dashboard-container {
-        flex-direction: column;
-    }
-    
     .sidebar {
-        width: 100%;
-        position: relative;
+        width: 70px;
+        overflow: hidden;
     }
-    
-    .sidebar-menu {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
+    .sidebar-header {
+        padding: 20px 10px;
     }
-    
-    .menu-item {
-        flex: 1 1 50%;
-        min-width: 120px;
+    .logo {
+        width: 50px;
+        height: 50px;
     }
-    
-    .menu-link {
-        flex-direction: column;
-        padding: 10px;
-        text-align: center;
+    .company-name,
+    .menu-text {
+        display: none;
     }
-    
     .menu-icon {
         margin-right: 0;
-        margin-bottom: 5px;
-        font-size: 20px;
-    }
-    
-    .main-content {
-        margin-left: 0;
+        display: block;
         width: 100%;
-    }
-    
-    .header-top {
-        flex-direction: column;
-        gap: 15px;
         text-align: center;
+    }
+    .header-top {
         padding: 15px 20px;
     }
-    
     .company-info h1 {
-        font-size: 16px;
-    }
-    
-    .company-info h2 {
         font-size: 14px;
     }
-    
+    .company-info h2 {
+        font-size: 12px;
+    }
     .dashboard-content {
-        padding: 15px;
+        padding: 20px;
     }
-    
-    .kojen-motor-section {
-        padding: 15px;
-    }
-    
-    .kojen-table-container {
-        overflow-x: auto;
-        margin: 0 -15px;
-        padding: 0 15px;
-    }
-    
-    .kojen-table {
-        min-width: 800px;
-        font-size: 12px;
-    }
-    
-    .kojen-table-row {
-        grid-template-columns: 50px repeat(4, 1fr);
-    }
-    
-    .kojen-table-cell {
-        font-size: 10px;
-        padding: 6px 3px;
-    }
-    
-    .header-cell {
-        font-size: 9px;
-    }
-    
-    .motor-btn {
-        padding: 8px 12px;
-        font-size: 12px;
-    }
-    
     .kojen-actions {
         flex-direction: column;
     }
-    
-    .form-actions {
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .form-actions button {
-        width: 100%;
+    .kojen-table-row {
+        grid-template-columns: 50px repeat(4, 1fr);
     }
 }
 
@@ -1098,109 +1036,52 @@ body {
     }
 }
 
-@media (max-width: 480px) {
-    .header-top,
-    .header-bottom {
-        padding: 10px 15px;
+/* Ana Container Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 70px;
+        overflow: hidden;
     }
-    
+    .sidebar-header {
+        padding: 20px 10px;
+    }
+    .logo {
+        width: 50px;
+        height: 50px;
+    }
+    .company-name,
+    .menu-text {
+        display: none;
+    }
+    .menu-icon {
+        margin-right: 0;
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+    .header-top {
+        padding: 15px 20px;
+    }
     .company-info h1 {
         font-size: 14px;
     }
-    
     .company-info h2 {
         font-size: 12px;
     }
-    
     .dashboard-content {
-        padding: 10px;
+        padding: 20px;
     }
-    
-    .kojen-motor-section {
-        padding: 10px;
+    .kojen-actions {
+        flex-direction: column;
     }
-    
-    .kojen-table {
-        font-size: 10px;
-    }
-    
     .kojen-table-row {
-        grid-template-columns: 40px repeat(3, 1fr);
+        grid-template-columns: 50px repeat(4, 1fr);
     }
-    
     .kojen-table-cell {
         font-size: 9px;
-        padding: 4px 2px;
+        padding: 6px 2px;
     }
-    
     .header-cell {
         font-size: 8px;
-    }
-    
-    .motor-btn {
-        padding: 6px 8px;
-        font-size: 10px;
-    }
-    
-    .menu-item {
-        flex: 1 1 100%;
-        min-width: auto;
-    }
-}
-
-/* Mobil Sidebar Stilleri */
-@media (max-width: 1200px) {
-    .sidebar {
-        position: fixed;
-        left: -280px;
-        top: 0;
-        height: 100vh;
-        z-index: 1000;
-        transition: left 0.3s ease;
-    }
-    
-    .sidebar.active {
-        left: 0;
-    }
-    
-    .menu-toggle {
-        display: block;
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 1001;
-        background: #e94560;
-        color: white;
-        border: none;
-        padding: 12px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 18px;
-        box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
-    }
-    
-    .menu-toggle:hover {
-        background: #d63851;
-        transform: scale(1.05);
-    }
-    
-    .overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-    }
-    
-    .overlay.active {
-        display: block;
-    }
-    
-    .main-content {
-        margin-left: 0;
-        width: 100%;
     }
 }

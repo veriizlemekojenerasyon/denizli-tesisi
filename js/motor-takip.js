@@ -1,61 +1,12 @@
 // Motor Takip JavaScript Fonksiyonları
 
-// Yetki kontrolü fonksiyonu
-function checkAdminAccess() {
-    const currentUser = localStorage.getItem('currentUser');
-    if (!currentUser) {
-        showAccessDenied('Oturum bulunamadı');
-        return false;
-    }
-    
-    try {
-        const user = JSON.parse(currentUser);
-        if (user.role !== 'admin') {
-            showAccessDenied('Bu sayfaya sadece admin rolündeki kullanıcılar erişebilir');
-            return false;
-        }
-        return true;
-    } catch (e) {
-        showAccessDenied('Oturum hatası');
-        return false;
-    }
-}
-
-// Erişim engelleme ekranı
-function showAccessDenied(message) {
-    document.body.innerHTML = `
-        <div class="container">
-            <div class="lock-screen">
-                <h2>🚫 Erişim Engellendi</h2>
-                <p>${message}</p>
-                <p><a href="index.html">Ana Sayfaya Dön</a></p>
-            </div>
-        </div>
-    `;
-}
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgisini güncelle
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-        }
-    }
-    
-    // Yetki kontrolü yap
-    if (!checkAdminAccess()) {
-        return;
-    }
-    
     // Sayfa yüklendiğinde çalışacak fonksiyonlar
     initializeMotorTracking();
     updateDateTime();
     setInterval(updateDateTime, 1000);
     
-    console.log('Motor Takip sayfası yüklendi (Admin erişimi)');
+    console.log('Motor Takip sayfası yüklendi');
 });
 
 // Tarih ve Saat Güncelleme

@@ -1,40 +1,4 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgisini güncelle
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-        }
-    }
-    
-    // Mobil Menü Fonksiyonları
-    const menuToggle = document.getElementById('menuToggle');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('overlay');
-    
-    if (menuToggle && sidebar && overlay) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-        });
-        
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-        
-        // Sidebar menü linklerine tıklandığında menüyü kapat
-        const menuLinks = document.querySelectorAll('.menu-link');
-        menuLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-            });
-        });
-    }
-    
     // Elementleri seç
     const tarihSecimi = document.getElementById('tarihSecimi');
     const vardiyaSecimi = document.getElementById('vardiyaSecimi');

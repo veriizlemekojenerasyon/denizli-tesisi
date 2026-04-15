@@ -1,44 +1,7 @@
 // Kojen Enerji Veri JavaScript - Google Sheets Entegrasyonu
-document.addEventListener('DOMContentLoaded', function() {
-    // Kullanıcı bilgisini güncelle
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById('userNameDisplay');
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-        }
-    }
-    
-    // Mobil Menü Fonksiyonları
-    const menuToggle = document.getElementById('menuToggle');
-    const sidebar = document.querySelector('.sidebar');
-    const overlay = document.getElementById('overlay');
-    
-    if (menuToggle && sidebar && overlay) {
-        menuToggle.addEventListener('click', function() {
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-        });
-        
-        overlay.addEventListener('click', function() {
-            sidebar.classList.remove('active');
-            overlay.classList.remove('active');
-        });
-        
-        // Sidebar menü linklerine tıklandığında menüyü kapat
-        const menuLinks = document.querySelectorAll('.menu-link');
-        menuLinks.forEach(link => {
-            link.addEventListener('click', function() {
-                sidebar.classList.remove('active');
-                overlay.classList.remove('active');
-            });
-        });
-    }
-    
-    // Google Apps Script URLbutonları
+document.addEventListener('DOMContentLoaded', async function() {
+    // Motor seçim butonları
     const motorButtons = document.querySelectorAll('.motor-btn');
-    console.log('Motor butonları bulundu:', motorButtons.length, motorButtons);
     let selectedMotor = 'GM-1';
     let isLocked = false;
     
@@ -260,11 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event listeners
     motorButtons.forEach(button => button.addEventListener('click', async function() {
-        console.log('Motor butonuna tıklandı:', this.dataset.motor);
         motorButtons.forEach(btn => btn.classList.remove('active'));
         this.classList.add('active');
         selectedMotor = this.dataset.motor;
-        console.log('Seçilen motor:', selectedMotor);
         showMessage(`${selectedMotor} motoru seçildi!`, 'info');
         // Inputları temizle
         document.querySelectorAll('.kojen-input').forEach(input => {
@@ -298,11 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         await checkAndUpdateFormStatus();
     }
 
-    // Otomatik ayarları çalıştır
-    (async () => {
-        await otomatikAyarlar();
-    })();
-    
+    await otomatikAyarlar();
     setInterval(async () => {
         const hours = String(new Date().getHours()).padStart(2, '0');
         if (currentHourElement && currentHourElement.textContent !== `${hours}:00`) {

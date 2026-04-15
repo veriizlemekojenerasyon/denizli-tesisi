@@ -2,7 +2,7 @@
 // Her sayfa için aktif menüyü belirlemek üzere kullanılır
 
 const standardMenu = [
-    { id: 'anasayfa', icon: '🏠', text: 'Ana Sayfa', href: 'anasayfa.html' },
+    { id: 'anasayfa', icon: '🏠', text: 'Ana Sayfa', href: 'index.html' },
     { id: 'saatlik', icon: '📊', text: 'Saatlik Veri Girişi', href: 'saatlik-veri-giris.html' },
     { id: 'gunluk', icon: '📆', text: 'Günlük Veri Girişi', href: 'gunluk-veri-giris.html' },
     { id: 'buhar', icon: '💨', text: 'Buhar Verisi', href: 'buhar-verisi.html' },

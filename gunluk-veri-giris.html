@@ -1,15 +1,15 @@
-﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gü¼nlü¼k Veri Girişi - Kojenerasyon</title>
+    <title>Günlük Veri Girişi - Kojenerasyon</title>
     <link rel="stylesheet" href="css/gunluk-veri-giris.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sol Navigasyon Menü¼sü¼ -->
+        <!-- Sol Navigasyon Menüsü -->
         <nav class="sidebar">
             <div class="sidebar-header">
                 <div class="logo-container">
@@ -20,102 +20,99 @@
             <ul class="sidebar-menu">
                 <li class="menu-item">
                     <a href="anasayfa.html" class="menu-link">
-                        <span class="menu-icon">ğŸ </span>
+                        <span class="menu-icon">🏠</span>
                         <span class="menu-text">Ana Sayfa</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="saatlik-veri-giris.html" class="menu-link">
-                        <span class="menu-icon">ğŸ“Š</span>
+                        <span class="menu-icon">📊</span>
                         <span class="menu-text">Saatlik Veri Girişi</span>
                     </a>
                 </li>
                 <li class="menu-item active">
                     <a href="gunluk-veri-giris.html" class="menu-link">
-                        <span class="menu-icon">ğŸ“†</span>
-                        <span class="menu-text">Gü¼nlü¼k Veri Girişi</span>
+                        <span class="menu-icon">📆</span>
+                        <span class="menu-text">Günlük Veri Girişi</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="buhar-verisi.html" class="menu-link">
-                        <span class="menu-icon">ğŸ’¨</span>
+                        <span class="menu-icon">💨</span>
                         <span class="menu-text">Buhar Verisi</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="vardiya.html" class="menu-link">
-                        <span class="menu-icon">ğŸ‘¥</span>
+                        <span class="menu-icon">👥</span>
                         <span class="menu-text">Vardiya Takip</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="motor-takip.html" class="menu-link">
-                        <span class="menu-icon">âš™ï¸</span>
+                        <span class="menu-icon">⚙️</span>
                         <span class="menu-text">Motor Takip</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="kojen-motor-veri.html" class="menu-link">
-                        <span class="menu-icon">âš™ï¸</span>
+                        <span class="menu-icon">⚙️</span>
                         <span class="menu-text">Kojen Motor Veri</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="kojen-enerji-veri.html" class="menu-link">
-                        <span class="menu-icon">âš¡</span>
+                        <span class="menu-icon">⚡</span>
                         <span class="menu-text">Kojen Enerji Veri</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="bakim-takibi.html" class="menu-link">
-                        <span class="menu-icon">ğŸ”§</span>
-                        <span class="menu-text">Bakı±m Takibi</span>
+                        <span class="menu-icon">🔧</span>
+                        <span class="menu-text">Bakım Takibi</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="stok-takip.html" class="menu-link">
-                        <span class="menu-icon">ğŸ“¦</span>
+                        <span class="menu-icon">📦</span>
                         <span class="menu-text">Stok Takip</span>
                     </a>
                 </li>
                 <li class="menu-item">
                     <a href="kullanici-yonetimi.html" class="menu-link">
-                        <span class="menu-icon">ğŸ‘¤</span>
-                        <span class="menu-text">Kullanı±cı± Yü¶netimi</span>
+                        <span class="menu-icon">👤</span>
+                        <span class="menu-text">Kullanıcı Yönetimi</span>
                     </a>
                 </li>
             </ul>
             <div class="sidebar-footer">
-                <div class="user-info" style="padding: 10px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.2); margin-bottom: 10px;">
-                    <span id="userNameDisplay" style="color: white; font-size: 13px; font-weight: 500;">Yü¼kleniyor...</span>
-                </div>
-                <button class="logout-btn" id="sidebarLogout">ü‡ı±kı±ş Yap</button>
+                <button class="logout-btn" id="sidebarLogout">Çıkış Yap</button>
             </div>
         </nav>
 
-        <!-- Ana ı°ü§erik Alanı± -->
+        <!-- Ana İçerik Alanı -->
         <div class="main-content">
-            <!-- üœst Header -->
+            <!-- Üst Header -->
             <header class="header">
                 <div class="header-top">
                     <div class="company-info">
-                        <h1>KORUMA KLOR ALKALı° Şı°RKETLER GRUBU</h1>
-                        <h2>KOJENERASYON Bü–LüœMüœ</h2>
+                        <h1>KORUMA KLOR ALKALİ ŞİRKETLER GRUBU</h1>
+                        <h2>KOJENERASYON BÖLÜMÜ</h2>
                     </div>
                     <div class="user-info">
-                        <span class="welcome-text">Hoşgeldin, <span id="userNameDisplay">Yükleniyor...</span></span>
-                        <button class="logout-btn" id="headerLogout">ü‡ı±kı±ş Yap</button>
+                        <span class="welcome-text">Hoşgeldin, <span id="user-name-display">Admin</span></span>
+                        <button class="logout-btn" id="headerLogout">Çıkış Yap</button>
                     </div>
                 </div>
                 <div class="header-bottom">
-                    <h3>Gü¼nlü¼k Veri Girişi</h3>
+                    <h3>Günlük Veri Girişi</h3>
                 </div>
             </header>
 
-            <!-- Form ı°ü§eriıŸi -->
+            <!-- Form İçeriği -->
             <main class="dashboard-content">
                 <section class="data-entry-section">
-                    <h2 class="section-title">Gü¼nlü¼k Veri Giriş Formu</h2>
+                    <h2 class="section-title">Günlük Veri Giriş Formu</h2>
                     
                     <form id="gunlukVeriForm" class="data-form">
                         <!-- Tarih Bilgisi -->
@@ -126,9 +123,9 @@
                             </div>
                         </div>
 
-                        <!-- Gü¼nlü¼k DeıŸerler -->
+                        <!-- Günlük Değerler -->
                         <div class="form-section">
-                            <h3>Gü¼nlü¼k DeıŸerler</h3>
+                            <h3>Günlük Değerler</h3>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="YAGSEVIYESI">YAG SEVIYESI (LT)</label>
@@ -155,7 +152,7 @@
                                     <input type="number" id="GM3" name="GM3" step="0.001" placeholder="0.000" required>
                                 </div>
                                 <div class="form-group">
-                                    <label for="ICIHTIYAC">ı°ü‡ ı°HTı°YAC (MWH)</label>
+                                    <label for="ICIHTIYAC">İÇ İHTİYAC (MWH)</label>
                                     <input type="number" id="ICIHTIYAC" name="ICIHTIYAC" step="0.001" placeholder="0.000" required>
                                 </div>
                             </div>
@@ -171,7 +168,7 @@
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label for="KOJENICIHTIYAC">KOJEN ı°ü‡ ı°HTIYAC (KWH)</label>
+                                    <label for="KOJENICIHTIYAC">KOJEN İÇ İHTIYAC (KWH)</label>
                                     <input type="number" id="KOJENICIHTIYAC" name="KOJENICIHTIYAC" step="0.001" placeholder="0.000" required>
                                 </div>
                                 <div class="form-group">
@@ -188,37 +185,37 @@
                         </div>
                     </form>
                     
-                    <!-- Son 32 Gü¼nlü¼k Kayı±tlar -->
+                    <!-- Son 32 Günlük Kayıtlar -->
                     <div class="recent-records">
-                        <h3 class="subsection-title">Son 32 Gü¼nlü¼k Kayı±t</h3>
+                        <h3 class="subsection-title">Son 32 Günlük Kayıt</h3>
                         <div class="table-container">
                             <table class="records-table" id="recordsTable">
                                 <thead>
                                     <tr class="group-header">
-                                        <th>Sı±ra</th>
+                                        <th>Sıra</th>
                                         <th>Tarih</th>
-                                        <th>YaıŸ Seviyesi (LT)</th>
+                                        <th>Yağ Seviyesi (LT)</th>
                                         <th>Kuplaj (MWH)</th>
-                                        <th colspan="3" class="group-production">MOTOR üœRETı°M (MWH)</th>
-                                        <th colspan="5" class="group-consumption">TüœKETı°M (MWH / KWH)</th>
+                                        <th colspan="3" class="group-production">MOTOR ÜRETİM (MWH)</th>
+                                        <th colspan="5" class="group-consumption">TÜKETİM (MWH / KWH)</th>
                                     </tr>
                                     <tr class="sub-header">
-                                        <th>Sı±ra</th>
+                                        <th>Sıra</th>
                                         <th>Tarih</th>
-                                        <th>YaıŸ Seviyesi (LT)</th>
+                                        <th>Yağ Seviyesi (LT)</th>
                                         <th>Kuplaj (MWH)</th>
                                         <th class="group-production">GM-1</th>
                                         <th class="group-production">GM-2</th>
                                         <th class="group-production">GM-3</th>
-                                        <th class="group-consumption">ı°ü§ ı°htiyaü§</th>
-                                        <th class="group-consumption">Redresü¶r-1</th>
-                                        <th class="group-consumption">Redresü¶r-2</th>
-                                        <th class="group-consumption">Kojen ı°ü§ ı°htiyaü§</th>
+                                        <th class="group-consumption">İç İhtiyaç</th>
+                                        <th class="group-consumption">Redresör-1</th>
+                                        <th class="group-consumption">Redresör-2</th>
+                                        <th class="group-consumption">Kojen İç İhtiyaç</th>
                                         <th class="group-consumption">Servis Trafo</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recordsTableBody">
-                                    <!-- Kayı±tlar JavaScript ile doldurulacak -->
+                                    <!-- Kayıtlar JavaScript ile doldurulacak -->
                                 </tbody>
                             </table>
                         </div>
@@ -229,30 +226,5 @@
     </div>
 
     <script src="js/gunluk-veri-sheets.js"></script>
-    <script>
-        (function displayUserName() {
-            const logged = localStorage.getItem('loggedInUser');
-            const display = document.getElementById('userNameDisplay');
-            if (display && logged) {
-                try {
-                    const user = JSON.parse(logged);
-                    const firstName = user.firstName || user.ad || user['Ad'] || '';
-                    const lastName = user.lastName || user.soyad || user['Soyad'] || '';
-                    display.textContent = (firstName + ' ' + lastName).trim() || user.email || 'Kullanı±cı±';
-                } catch (e) { display.textContent = 'Kullanı±cı±'; }
-            } else if (display) { display.textContent = 'Misafir'; }
-        })();
-    </script>
-<script>
-    const loggedInUser = localStorage.getItem("loggedInUser");
-    if (loggedInUser) {
-        const user = JSON.parse(loggedInUser);
-        const userNameDisplay = document.getElementById("userNameDisplay");
-        if (userNameDisplay) {
-            userNameDisplay.textContent = user.firstName + " " + user.lastName;
-        }
-    }
-</script>
 </body>
 </html>
-

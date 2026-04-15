@@ -58,7 +58,7 @@ function showLockScreen(type) {
             <div class="lock-screen">
                 <h2>${msg.title}</h2>
                 <p>${msg.text}</p>
-                <p><a href="index.html">Ana Sayfaya Git</a></p>
+                <p><a href="index.html">Giris Sayfasina Git</a></p>
             </div>
         </div>`;
 }

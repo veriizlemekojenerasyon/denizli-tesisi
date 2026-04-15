@@ -25,23 +25,9 @@ const SaatlikApp = {
     init: function() {
         console.log('SaatlikApp başlatılıyor...');
         
-        // Kullanıcı bilgisini güncelle
-        this.updateUserDisplay();
-        
         this.setupEventListeners();
         this.setInitialValues();
         this.loadLastRecords();
-    },
-    
-    updateUserDisplay: function() {
-        const loggedInUser = localStorage.getItem('loggedInUser');
-        if (loggedInUser) {
-            const user = JSON.parse(loggedInUser);
-            const userNameDisplay = document.getElementById('userNameDisplay');
-            if (userNameDisplay) {
-                userNameDisplay.textContent = user.firstName + ' ' + user.lastName;
-            }
-        }
     },
     
     setupEventListeners: function() {
