@@ -310,6 +310,50 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
     }
 
+    // 🔍 MOTORUN SON KAYDINI GETİR (Motor Çalışmıyor için)
+    async function getLastRecordForMotor(motor) {
+        try {
+            // Cache'den bu motorun tüm kayıtlarını bul
+            const motorRecords = cachedRecords.filter(record => 
+                record.motor === motor && 
+                record.durum !== 'MOTOR ÇALIŞMIYOR' // Sadece normal kayıtları al
+            );
+            
+            if (motorRecords.length === 0) {
+                console.log(`⚠️ ${motor} için normal kayıt bulunamadı`);
+                return null;
+            }
+            
+            // Tarih ve saate göre sırala (en son kayıt)
+            motorRecords.sort((a, b) => {
+                const dateA = parseDateTime(a.tarih, a.saat);
+                const dateB = parseDateTime(b.tarih, b.saat);
+                return dateB - dateA; // En son kayıt önce
+            });
+            
+            const lastRecord = motorRecords[0];
+            console.log(`✅ ${motor} için son kayıt bulundu:`, lastRecord);
+            return lastRecord;
+            
+        } catch (error) {
+            console.error('Son kayıt getirme hatası:', error);
+            return null;
+        }
+    }
+    
+    // 📅 Tarih ve saat string'ini Date objesine çevir
+    function parseDateTime(tarih, saat) {
+        try {
+            // Tarih formatı: DD.MM.YYYY
+            const [day, month, year] = tarih.split('.');
+            // Saat formatı: HH:00
+            const [hour] = saat.split(':');
+            return new Date(year, month - 1, day, hour);
+        } catch (e) {
+            return new Date(0); // Hata durumunda en eski tarih
+        }
+    }
+
     // Form kilit fonksiyonları
     function lockForm(showMsg = true) {
         isLocked = true;
@@ -422,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         showMessage('Tüm veriler temizlendi!', 'info');
     });
 
-    // Motor çalışmıyor kaydet
+    // Motor çalışmıyor kaydet - Son değerleri kullanarak
     motorCalismiyorKaydetBtn?.addEventListener('click', async function() {
         if (isLocked) { showMessage('Bu kayıt zaten mevcut!', 'error'); return; }
         const saat = `${String(new Date().getHours()).padStart(2, '0')}:00`;
@@ -434,14 +478,56 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
         
+        // 🔍 SON KAYITTAN DEĞERLERİ AL
+        const lastRecord = await getLastRecordForMotor(selectedMotor);
+        
+        // Son kayıt değerleri (yoksa 0)
+        const toplamAktifEnerji = lastRecord?.toplamAktifEnerji || '0';
+        const calismaSaati = lastRecord?.calismaSaati || '0';
+        const kalkisSayisi = lastRecord?.kalkisSayisi || '0';
+        
+        console.log('🔍 Son kayıt değerleri:', { toplamAktifEnerji, calismaSaati, kalkisSayisi });
+        
+        // Input'lara değerleri yaz (görsel geri bildirim)
+        const inputs = document.querySelectorAll('.kojen-input');
+        inputs.forEach((input, index) => {
+            input.style.background = '#ffebee';
+            input.style.color = '#c62828';
+            if (index === 8) input.value = toplamAktifEnerji; // TOPLAM AKTİF ENERJİ
+            else if (index === 9) input.value = calismaSaati;  // ÇALIŞMA SAATİ
+            else if (index === 10) input.value = kalkisSayisi; // KALKIŞ SAYISI
+            else input.value = '0'; // Diğerleri 0
+        });
+        
         motorCalismiyorKaydetBtn.disabled = true; motorCalismiyorKaydetBtn.textContent = '⚠️ KAYDEDİLİYOR...';
+        
         try {
-            const result = await saveEnerjiToSheets({motor: selectedMotor, tarih: tarihSecimi.value, vardiya: vardiyaSecimi.value, saat, kaydeden: 'Admin', durum: 'MOTOR ÇALIŞMIYOR'});
+            const result = await saveEnerjiToSheets({
+                motor: selectedMotor, 
+                tarih: tarihSecimi.value, 
+                vardiya: vardiyaSecimi.value, 
+                saat, 
+                kaydeden: 'Admin', 
+                durum: 'MOTOR ÇALIŞMIYOR',
+                // Son kayıt değerleri
+                toplamAktifEnerji: toplamAktifEnerji,
+                calismaSaati: calismaSaati,
+                kalkisSayisi: kalkisSayisi,
+                // Diğer değerler 0
+                aydemVoltaji: '0',
+                aktifGuc: '0',
+                reaktifGuc: '0',
+                cosPhi: '0',
+                ortAkim: '0',
+                ortGerilim: '0',
+                notrAkim: '0',
+                tahrikGerilimi: '0'
+            });
+            
             if (result.success) {
                 // 🔥 CACHE'İ GÜNCELLE
                 refreshCache();
-                document.querySelectorAll('.kojen-input').forEach(input => { input.value = '0'; input.style.background = '#ffebee'; input.style.color = '#c62828'; });
-                showMessage(`${selectedMotor} motoru için "ÇALIŞMIYOR" durumu kaydedildi!`, 'warning');
+                showMessage(`${selectedMotor} motoru için "ÇALIŞMIYOR" durumu kaydedildi! (Son değerler: Enerji ${toplamAktifEnerji}, Saat ${calismaSaati}, Kalkış ${kalkisSayisi})`, 'warning');
                 lockForm(false);
                 await loadVardiyaData();
             } else {
