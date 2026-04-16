@@ -31,13 +31,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Önce kimlik dogrulama kontrolü
     checkAuth();
     
-    // ⚡ CACHE'I BLOCKING OLMADAN BAŞLAT - Butonları bekleme
-    setTimeout(() => refreshCache(), 100); // 100ms gecikme ile başla
+    // 🔒 BAŞLANGIÇTA TÜM FORM PASİF - Güvenlik için
+    disableAllFormElements();
     
-    // 🔒 SAYFA YÜKLENİNCE MEVCUT KAYIT KONTROLÜ
+    // ⚡ CACHE'I BLOCKING OLMADAN BAŞLAT
+    setTimeout(() => refreshCache(), 100);
+    
+    // � 1 SN SONRA KAYIT KONTROLÜ VE AÇ/KİLİTLE
     setTimeout(async () => {
-        await checkAndUpdateFormStatus();
-    }, 500); // Cache dolması için bekle
+        await checkAndUnlockOrLockForm();
+    }, 1000);
     
     // Elementleri seç
     const tarihSecimi = document.getElementById('tarihSecimi');
@@ -159,6 +162,97 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Background cache hatası:', error);
             }
         }, 240000); // 4 dakika
+    }
+
+    // 🔒 BAŞLANGIÇTA TÜM FORM PASİF YAP
+    function disableAllFormElements() {
+        console.log('🔒 Form başlangıçta pasif yapılıyor...');
+        
+        // Input'ları pasif yap
+        const allInputs = document.querySelectorAll('.data-input');
+        allInputs.forEach(input => {
+            input.disabled = true;
+            input.style.background = '#f5f5f5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        // Butonları pasif yap
+        const buttons = [kaydetBtn, temizleBtn, motorCalismiyorKaydetBtn];
+        buttons.forEach(btn => {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }
+        });
+        
+        // Motor seçim butonlarını pasif yap
+        motorButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.style.cursor = 'not-allowed';
+        });
+    }
+    
+    // 🔓 TÜM FORM ELEMANLARINI AKTİF YAP (kayıt yoksa)
+    function enableAllFormElements() {
+        console.log('🔓 Form aktif yapılıyor...');
+        
+        // Input'ları aktif yap
+        const allInputs = document.querySelectorAll('.data-input');
+        allInputs.forEach(input => {
+            input.disabled = false;
+            input.style.background = 'white';
+            input.style.cursor = 'text';
+        });
+        
+        // Butonları aktif yap
+        const buttons = [kaydetBtn, temizleBtn, motorCalismiyorKaydetBtn];
+        buttons.forEach(btn => {
+            if (btn) {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            }
+        });
+        
+        // Motor seçim butonlarını aktif yap
+        motorButtons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+            btn.style.cursor = 'pointer';
+        });
+        
+        showMessage('Yeni kayıt yapabilirsiniz.', 'success');
+    }
+    
+    // 🔍 KAYIT KONTROLÜ SONRASI AÇ/KİLİTLE MANTIĞI
+    async function checkAndUnlockOrLockForm() {
+        if (!selectedMotor || !tarihSecimi?.value || !currentHourElement?.textContent) {
+            console.log('Kontrol: Eksik parametre');
+            enableAllFormElements(); // Eksikse yine de aç
+            return;
+        }
+        
+        try {
+            const saat = currentHourElement.textContent.trim();
+            const existingRecord = await checkExistingRecord(selectedMotor, tarihSecimi.value, saat);
+            
+            if (existingRecord) {
+                // 🔒 KAYIT VAR - Form kilitli kalır, veriler yüklenir
+                console.log('🔒 Kayıt bulundu, form kilitli:', existingRecord);
+                lockForm(false);
+                loadExistingRecord(existingRecord);
+                showMessage(`Mevcut kayıt yüklendi: ${existingRecord.durum || 'NORMAL'}`, 'info');
+            } else {
+                // 🔓 KAYIT YOK - Form açılır
+                console.log('🔓 Kayıt yok, form açılıyor');
+                enableAllFormElements();
+            }
+        } catch (error) {
+            console.error('Kontrol hatası:', error);
+            enableAllFormElements(); // Hata durumunda yine de aç
+        }
     }
 
     // Tarih formatını düzeltme fonksiyonu (HTML input için)
