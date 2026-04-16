@@ -31,17 +31,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Önce kimlik dogrulama kontrolü
     checkAuth();
     
-    // 🔒 BAŞLANGIÇTA TÜM FORM PASİF - Güvenlik için
-    disableAllFormElements();
-    
-    // ⚡ CACHE'I BLOCKING OLMADAN BAŞLAT
-    setTimeout(() => refreshCache(), 100);
-    
-    // � 1 SN SONRA KAYIT KONTROLÜ VE AÇ/KİLİTLE
-    setTimeout(async () => {
-        await checkAndUnlockOrLockForm();
-    }, 1000);
-    
     // Elementleri seç
     const tarihSecimi = document.getElementById('tarihSecimi');
     const vardiyaSecimi = document.getElementById('vardiyaSecimi');
@@ -62,6 +51,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // Seçili motor
     let selectedMotor = 'GM-1';
     let isLocked = false; // Form kilit durumu
+
+    // 🔒 BAŞLANGIÇTA TÜM FORM PASİF YAP
+    disableAllFormElements();
+    
+    // ⚡ CACHE BAŞLAT
+    setTimeout(() => refreshCache(), 100);
+    
+    // 🔍 1 SN SONRA KAYIT KONTROLÜ VE AÇ/KİLİTLE
+    setTimeout(async () => {
+        await checkAndUnlockOrLockForm();
+    }, 1000);
 
     // Mevcut saati güncelleme fonksiyonu
     function updateCurrentHour() {
