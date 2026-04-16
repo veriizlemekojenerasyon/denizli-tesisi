@@ -598,10 +598,43 @@ document.addEventListener('DOMContentLoaded', async function() {
             filtered.sort((a, b) => (getSaatDegeri(a.saat) || 0) - (getSaatDegeri(b.saat) || 0));
             if (!filtered.length) { if (noDataMessage) { noDataMessage.textContent = `${motor} motoru için bu vardiya saat aralığında henüz kayıt bulunmamaktadır.`; noDataMessage.style.display = 'block'; } return; }
             if (noDataMessage) noDataMessage.style.display = 'none';
+            
+            // 🔍 MOTOR ÇALIŞMIYOR kayıtları için son normal kayıtları bul
+            const sonNormalKayitlar = {};
+            filtered.forEach(record => {
+                if (record.durum !== 'MOTOR ÇALIŞMIYOR') {
+                    // Bu motor için son normal kaydı sakla
+                    const motor = record.motor;
+                    const recDateTime = parseDateTime(record.tarih, record.saat);
+                    if (!sonNormalKayitlar[motor] || parseDateTime(sonNormalKayitlar[motor].tarih, sonNormalKayitlar[motor].saat) < recDateTime) {
+                        sonNormalKayitlar[motor] = record;
+                    }
+                }
+            });
+            
             filtered.forEach(record => {
                 const row = document.createElement('tr');
                 if (record.durum === 'MOTOR ÇALIŞMIYOR') row.classList.add('motor-calismiyor');
-                row.innerHTML = `<td>${record.saat || '-'}</td><td>${record.motor || '-'}</td><td>${record.aydemVoltaji || '-'}</td><td>${record.aktifGuc || '-'}</td><td>${record.reaktifGuc || '-'}</td><td>${record.cosPhi || '-'}</td><td>${record.ortAkif || '-'}</td><td>${record.ortGerilim || '-'}</td><td>${record.notrAkim || '-'}</td><td>${record.tahrikGerilimi || '-'}</td><td>${record.toplamAktifEnerji || '-'}</td><td>${record.calismaSaati || '-'}</td><td>${record.kalkisSayisi || '-'}</td><td class="${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'durum-calismiyor' : 'durum-normal'}">${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'ÇALIŞMIYOR' : 'NORMAL'}</td>`;
+                
+                // 🔍 MOTOR ÇALIŞMIYOR ise son değerleri kullan
+                let toplamAktifEnerji = record.toplamAktifEnerji || '-';
+                let calismaSaati = record.calismaSaati || '-';
+                let kalkisSayisi = record.kalkisSayisi || '-';
+                
+                if (record.durum === 'MOTOR ÇALIŞMIYOR' && sonNormalKayitlar[record.motor]) {
+                    const sonKayit = sonNormalKayitlar[record.motor];
+                    // Sadece bu kayıttan önceki son normal kayıt varsa kullan
+                    const currentDateTime = parseDateTime(record.tarih, record.saat);
+                    const sonKayitDateTime = parseDateTime(sonKayit.tarih, sonKayit.saat);
+                    
+                    if (sonKayitDateTime < currentDateTime) {
+                        toplamAktifEnerji = sonKayit.toplamAktifEnerji || '-';
+                        calismaSaati = sonKayit.calismaSaati || '-';
+                        kalkisSayisi = sonKayit.kalkisSayisi || '-';
+                    }
+                }
+                
+                row.innerHTML = `<td>${record.saat || '-'}</td><td>${record.motor || '-'}</td><td>${record.aydemVoltaji || '-'}</td><td>${record.aktifGuc || '-'}</td><td>${record.reaktifGuc || '-'}</td><td>${record.cosPhi || '-'}</td><td>${record.ortAkif || '-'}</td><td>${record.ortGerilim || '-'}</td><td>${record.notrAkim || '-'}</td><td>${record.tahrikGerilimi || '-'}</td><td>${toplamAktifEnerji}</td><td>${calismaSaati}</td><td>${kalkisSayisi}</td><td class="${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'durum-calismiyor' : 'durum-normal'}">${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'ÇALIŞMIYOR' : 'NORMAL'}</td>`;
                 tableBody.appendChild(row);
             });
         } catch (error) { console.error('Vardiya verileri yüklenirken hata:', error); }
