@@ -1,3 +1,34 @@
+// ⏰ Otomatik yönlendirme kontrolü (15:59, 23:59, 07:59)
+function checkAutoRedirect() {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const currentTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    
+    // Yönlendirme saatleri: 15:59, 23:59, 07:59
+    const redirectTimes = ['15:59', '23:59', '07:59'];
+    
+    if (redirectTimes.includes(currentTime)) {
+        console.log(`⏰ Otomatik yönlendirme saati: ${currentTime}`);
+        
+        // Vardiya İşlem Kaydetme modal'ı açık mı kontrol et
+        const islemModal = document.querySelector('.islem-detaylari-modal');
+        if (islemModal) {
+            console.log('💾 Vardiya İşlem Kaydetme açık, kaydediliyor...');
+            // Modal'ı kapat ve kaydet
+            islemModal.remove();
+        }
+        
+        // 2 saniye bekle ve yönlendir
+        setTimeout(() => {
+            localStorage.removeItem('loggedInUser');
+            window.location.href = 'index.html';
+        }, 2000);
+        return true;
+    }
+    return false;
+}
+
 // Kimlik dogrulama kontrolü
 function checkAuth() {
     const loggedInUser = localStorage.getItem('loggedInUser');
@@ -30,6 +61,10 @@ function checkAuth() {
 document.addEventListener('DOMContentLoaded', function() {
     // Önce kimlik dogrulama kontrolü
     checkAuth();
+    
+    // ⏰ Otomatik yönlendirme kontrolünü başlat (her dakika kontrol et)
+    checkAutoRedirect();
+    setInterval(checkAutoRedirect, 60000); // Her 60 saniyede bir kontrol et
     
     // Vardiya Google Apps Script URL
     const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz2NzLeBDcrZ9T-VoyqrK1J07zN4UlXm-WMrKkMv0AP_puG-0AMzQhNqnQ92D1zHWSp/exec';
@@ -164,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success) {
                 const vardiyaBilgisi = {
                     id: result.data.id,
+                    vardiya: selectedVardiya,
                     vardiyaAdi: vardiyaAdi,
                     tarih: selectedTarih,
                     personelId: selectedPersonelId,
@@ -214,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const url = new URL(VARDIYA_APPS_SCRIPT_URL);
                     url.searchParams.append('action', 'endVardiya');
                     url.searchParams.append('tarih', formattedTarih);
-                    url.searchParams.append('vardiya', vardiyaSelect.value);
+                    url.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
                     
                     const response = await fetch(url);
                     const result = await response.json();

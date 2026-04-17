@@ -1,5 +1,33 @@
 // Kojen Enerji Veri JavaScript - Google Sheets Entegrasyonu
 
+// ⏰ Otomatik yönlendirme kontrolü (15:59, 23:59, 07:59)
+function checkAutoRedirect() {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const currentTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    
+    // Yönlendirme saatleri: 15:59, 23:59, 07:59
+    const redirectTimes = ['15:59', '23:59', '07:59'];
+    
+    if (redirectTimes.includes(currentTime)) {
+        console.log(`⏰ Otomatik yönlendirme saati: ${currentTime}`);
+        // Vardiya İşlem Kaydetme kontrolü için event gönder
+        const event = new CustomEvent('beforeAutoRedirect', { 
+            detail: { time: currentTime, shouldSave: true } 
+        });
+        document.dispatchEvent(event);
+        
+        // 2 saniye bekle ve yönlendir
+        setTimeout(() => {
+            localStorage.removeItem('loggedInUser');
+            window.location.href = 'index.html';
+        }, 2000);
+        return true;
+    }
+    return false;
+}
+
 // Kimlik dogrulama kontrolü
 function checkAuth() {
     const loggedInUser = localStorage.getItem('loggedInUser');
@@ -32,6 +60,10 @@ function checkAuth() {
 document.addEventListener('DOMContentLoaded', async function() {
     // Önce kimlik dogrulama kontrolü
     checkAuth();
+    
+    // ⏰ Otomatik yönlendirme kontrolünü başlat (her dakika kontrol et)
+    checkAutoRedirect();
+    setInterval(checkAutoRedirect, 60000); // Her 60 saniyede bir kontrol et
     
     // ⚡ SUPER HIZLI Cache sistemi
     let cachedRecords = [];
