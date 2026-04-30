@@ -77,13 +77,23 @@ function handleFormSubmit(e) {
 
 // Buhar kaydını kaydet
 function saveBuharRecord(data) {
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    let userName = 'Admin';
+    
+    if (loggedInUser) {
+        try {
+            const user = JSON.parse(loggedInUser);
+            userName = `${user.firstName || user.ad || 'Admin'} ${user.lastName || user.soyad || ''}`.trim() || user.email || 'Admin';
+        } catch (e) {
+            console.error('Kullanıcı bilgileri okunamadı:', e);
+        }
+    }
     
     const record = {
         id: Date.now(),
         tarih: data.tarih,
         buharTon: data.buharTon,
-        kaydeden: `${currentUser.ad || 'Admin'} ${currentUser.soyad || ''}`,
+        kaydeden: userName,
         timestamp: new Date().toISOString()
     };
     

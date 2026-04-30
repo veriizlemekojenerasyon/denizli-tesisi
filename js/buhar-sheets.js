@@ -208,6 +208,19 @@ const BuharApp = {
     
     // Kullanici adi al
     getUserName: function() {
+        const loggedInUser = localStorage.getItem('loggedInUser');
+        
+        if (loggedInUser) {
+            try {
+                const user = JSON.parse(loggedInUser);
+                const fullName = `${user.firstName || user.ad || ''} ${user.lastName || user.soyad || ''}`.trim();
+                return fullName || user.email || BUHAR_CONFIG.DEFAULT_USER;
+            } catch (e) {
+                console.error('Kullanıcı bilgileri okunamadı:', e);
+            }
+        }
+        
+        // Fallback: eski currentUser kontrolü
         const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         return currentUser.name || currentUser.username || BUHAR_CONFIG.DEFAULT_USER;
     },
