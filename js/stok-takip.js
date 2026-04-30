@@ -16,8 +16,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Son işlemleri yükle
     await loadRecentTransactions();
     
-    // Özet kartları güncelle
-    await updateSummaryCards();
+    // Özet kartları güncelle (fonksiyon tanımlı değil, geçici olarak kaldırıldı)
+    // await updateSummaryCards();
     
     // Kullanıcı adını göster
     displayUserName();
@@ -119,7 +119,7 @@ async function handleStockSubmit(e) {
             e.target.reset();
             await loadStockList();
             await populateMaterialSelect();
-            await updateSummaryCards();
+            // await updateSummaryCards(); // Fonksiyon tanımlı değil
         } else {
             showNotification('error', 'Hata', result.error || 'Malzeme eklenemedi!');
         }
@@ -167,7 +167,7 @@ async function handleTransactionSubmit(e) {
             await loadStockList();
             await populateMaterialSelect();
             await loadRecentTransactions();
-            await updateSummaryCards();
+            // await updateSummaryCards(); // Fonksiyon tanımlı değil
         } else {
             showNotification('error', 'Hata', result.error || 'İşlem kaydedilemedi!');
         }
@@ -438,7 +438,7 @@ function deleteMaterial(id, showConfirm = true) {
         showNotification('success', 'Başarılı', 'Malzeme silindi!');
         loadStockList();
         populateMaterialSelect();
-        updateSummaryCards();
+        // updateSummaryCards(); // Fonksiyon tanımlı değil, geçici olarak kaldırıldı
     }
 }
 
@@ -487,31 +487,39 @@ function handleLogout() {
 
 // Kullanıcı adını göster
 function displayUserName() {
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    if (!loggedInUser) {
-        window.location.href = 'anasayfa.html';
-        return;
-    }
+    const updateUserName = () => {
+        const loggedInUser = localStorage.getItem('loggedInUser');
+        if (!loggedInUser) {
+            window.location.href = 'anasayfa.html';
+            return;
+        }
+        
+        try {
+            const user = JSON.parse(loggedInUser);
+            const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+            
+            // userNameDisplay elementini güncelle
+            const userNameElement = document.getElementById('userNameDisplay');
+            if (userNameElement) {
+                userNameElement.textContent = fullName || user.email || 'Kullanıcı';
+                console.log('Stok Takip - Kullanıcı adı ayarlandı:', fullName || user.email || 'Kullanıcı');
+            } else {
+                console.error('userNameDisplay elementi bulunamadı');
+            }
+        } catch (e) {
+            console.error('Stok Takip - Kullanıcı bilgileri okunamadı:', e);
+            const userNameElement = document.getElementById('userNameDisplay');
+            if (userNameElement) {
+                userNameElement.textContent = 'Kullanıcı';
+            }
+        }
+    };
     
-    try {
-        const user = JSON.parse(loggedInUser);
-        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-        
-        // Tüm userNameDisplay elementlerini güncelle
-        const allUserNameDisplays = document.querySelectorAll('[id="userNameDisplay"]');
-        
-        allUserNameDisplays.forEach((element, index) => {
-            element.textContent = fullName || user.email || 'Kullanıcı';
-        });
-        
-        console.log('Stok Takip - Kullanıcı adı ayarlandı:', fullName || user.email || 'Kullanıcı');
-    } catch (e) {
-        console.error('Stok Takip - Kullanıcı bilgileri okunamadı:', e);
-        const allElements = document.querySelectorAll('[id="userNameDisplay"]');
-        allElements.forEach(element => {
-            element.textContent = 'Kullanıcı';
-        });
-    }
+    // Birden fazla deneme
+    updateUserName();
+    setTimeout(updateUserName, 100);
+    setTimeout(updateUserName, 500);
+    setTimeout(updateUserName, 1000);
 }
 
 // Yardımcı fonksiyonlar
