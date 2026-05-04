@@ -28,6 +28,9 @@ const SaatlikApp = {
         this.setupEventListeners();
         this.setInitialValues();
         this.loadLastRecords();
+        
+        // 🔥 OTOMATİK KAYIT KONTROLÜ BAŞLAT
+        this.startAutoRecordCheck();
     },
     
     setupEventListeners: function() {
@@ -324,6 +327,74 @@ const SaatlikApp = {
         document.body.appendChild(notification);
         
         setTimeout(() => notification.remove(), 4000);
+    },
+    
+    // 🔥 OTOMATİK KAYIT KONTROLÜ
+    startAutoRecordCheck: function() {
+        console.log('🔥 Otomatik kayıt kontrolü başlatılıyor...');
+        
+        // Her 30 saniyede bir kontrol et
+        setInterval(() => {
+            this.checkAndAutoRecord();
+        }, 30000);
+        
+        // Sayfa yüklendiğinde de kontrol et
+        setTimeout(() => {
+            this.checkAndAutoRecord();
+        }, 5000);
+    },
+    
+    // 🔥 OTOMATİK KAYIT KONTROLÜ VE GÖNDERİM
+    checkAndAutoRecord: async function() {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        
+        console.log(`🔥 Saat kontrolü: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
+        
+        // 🔥 TEST İÇİN: Sadece 17:00-17:59 arasında kontrol et (normalde 16 olmalı)
+        if (currentHour !== 17 || currentMinute < 59) {
+            return;
+        }
+        
+        console.log('🔥 17:59 kontrolü yapılıyor...');
+        
+        // Bugünün tarihini al
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${year}-${month}-${day}`;
+        
+        // 16:00 kaydı var mı kontrol et
+        const hasRecord = await this.isExistingRecord(todayStr, '16:00');
+        
+        if (!hasRecord) {
+            console.log('🚨 16:00 kaydı bulunamadı! Otomatik kayıt gönderiliyor...');
+            
+            // Otomatik kayıt verileri
+            const autoData = {
+                tarih: todayStr,
+                saat: '16:00',
+                vardiya: '16-24',
+                aktifMwh: '0',
+                reaktifMwh: '0',
+                notlar: 'OTOMATİK KAYIT - VERİ GİRİLMEDİ'
+            };
+            
+            // Kaydı gönder
+            const result = await this.addRecord(autoData);
+            
+            if (result.success) {
+                console.log('✅ Otomatik 16:00 kaydı başarıyla gönderildi!');
+                this.showNotification('Otomatik Kayıt', '16:00 verisi otomatik olarak kaydedildi!', 'warning');
+                this.loadLastRecords();
+            } else {
+                console.error('❌ Otomatik kayıt başarısız:', result.error);
+            }
+        } else {
+            console.log('✅ 16:00 kaydı mevcut, otomatik kayıt gerekmiyor');
+        }
     }
 };
 
@@ -358,7 +429,6 @@ function checkAuth() {
         });
     }
 }
-
 
 document.addEventListener('DOMContentLoaded', function() {
     // Önce kimlik dogrulama kontrolü
