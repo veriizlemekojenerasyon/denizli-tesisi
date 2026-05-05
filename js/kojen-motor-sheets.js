@@ -4,7 +4,7 @@
  */
 
 const KojenMotorSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwZe71UGJ-p7czfZBW7D5XJla0wl5ops8NBgopKJ6LYve4lyfDfKY6ECOPiJbQ69YVi/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxg93uneiaVM-oWOnZB72zlpxSyucCpOIJgUddZOyOXTCnbwJpBPsyjqL9dzjPcFe1z/exec'
 };
 
 /**
@@ -177,8 +177,11 @@ async function getMotorRecordsByMotorAndDate(motor, tarih, vardiya) {
             url += `&vardiya=${encodeURIComponent(vardiya)}`;
         }
         
+        console.log(`🔍 API çağrısı: ${url}`);
+        
         const response = await fetch(url);
         const result = await response.json();
+        console.log(`🔍 API yanıt:`, result);
         return result;
         
     } catch (error) {
