@@ -37,15 +37,17 @@ async function saveMotorToSheets(data) {
         
         // Motor çalışmıyorsa tüm değerleri 0 olarak gönder
         if (data.durum === 'MOTOR ÇALIŞMIYOR') {
-            // Sadece gerekli alanları gönder
-            urlParams.append('yuksekHacim', '0');
-            urlParams.append('dusukHacim', '0');
-            urlParams.append('yuksekSicaklik', '0');
-            urlParams.append('dusukSicaklik', '0');
-            urlParams.append('yuksekBasinc', '0');
-            urlParams.append('dusukBasinc', '0');
-            urlParams.append('egzostSicaklik', '0');
-            urlParams.append('id', '0');
+            // Doğru alanları gönder
+            urlParams.append('jenYatakSicaklikDE', '0');
+            urlParams.append('jenYatakSicaklikNDE', '0');
+            urlParams.append('sogutmaSuyuSicaklik', '0');
+            urlParams.append('sogutmaSuyuBasinc', '0');
+            urlParams.append('yagSicaklik', '0');
+            urlParams.append('yagBasinc', '0');
+            urlParams.append('sarjSicaklik', '0');
+            urlParams.append('sarjBasinc', '0');
+            urlParams.append('gazRegulatoru', '0');
+            urlParams.append('makineDairesiSicaklik', '0');
             urlParams.append('karterBasinc', '0');
             urlParams.append('onKamaraFarkBasinc', '0');
             urlParams.append('sargiSicaklik1', '0');

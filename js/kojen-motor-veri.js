@@ -467,19 +467,22 @@ async function tekilKayitYap(islem) {
             kaydeden: islem.kaydeden,
             durum: 'MOTOR ÇALIŞMIYOR',
             not: islem.not,
-            // Son kayıt değerleri
-            yuksekHacim: islem.sonKayit?.yuksekHacim || '0',
-            dusukHacim: islem.sonKayit?.dusukHacim || '0',
-            yuksekSicaklik: islem.sonKayit?.yuksekSicaklik || '0',
-            dusukSicaklik: islem.sonKayit?.dusukSicaklik || '0',
-            yuksekBasinc: islem.sonKayit?.yuksekBasinc || '0',
-            dusukBasinc: islem.sonKayit?.dusukBasinc || '0',
-            egzostSicaklik: islem.sonKayit?.egzostSicaklik || '0',
-            id: islem.sonKayit?.id || '0',
+            // Son kayıt değerleri (doğru alanlar)
+            jenYatakSicaklikDE: islem.sonKayit?.jenYatakSicaklikDE || '0',
+            jenYatakSicaklikNDE: islem.sonKayit?.jenYatakSicaklikNDE || '0',
+            sogutmaSuyuSicaklik: islem.sonKayit?.sogutmaSuyuSicaklik || '0',
+            sogutmaSuyuBasinc: islem.sonKayit?.sogutmaSuyuBasinc || '0',
+            yagSicaklik: islem.sonKayit?.yagSicaklik || '0',
+            yagBasinc: islem.sonKayit?.yagBasinc || '0',
+            sarjSicaklik: islem.sonKayit?.sarjSicaklik || '0',
+            sarjBasinc: islem.sonKayit?.sarjBasinc || '0',
+            gazRegulatoru: islem.sonKayit?.gazRegulatoru || '0',
+            makineDairesiSicaklik: islem.sonKayit?.makineDairesiSicaklik || '0',
             karterBasinc: islem.sonKayit?.karterBasinc || '0',
             onKamaraFarkBasinc: islem.sonKayit?.onKamaraFarkBasinc || '0',
-            calismaSaati: islem.sonKayit?.calismaSaati || '0',
-            kalkisSayisi: islem.sonKayit?.kalkisSayisi || '0'
+            sargiSicaklik1: islem.sonKayit?.sargiSicaklik1 || '0',
+            sargiSicaklik2: islem.sonKayit?.sargiSicaklik2 || '0',
+            sargiSicaklik3: islem.sonKayit?.sargiSicaklik3 || '0'
         });
         
         if (!sonuc || !sonuc.success) {
