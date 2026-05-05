@@ -4,7 +4,7 @@
  */
 
 const KojenEnerjiSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbw8uCtVPK3IO83GLI1upNavopELwNpC2D-TeFgaaietkHWxDTwnGb4L9rxHVTSPI3mG/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzL1RDBYT3SCS2Nvn6SY8ySkv7-6XZAbxe9gWenoeNVsoEUPEaO0bfDWQ0eWR7hnQEc/exec'
 };
 
 /**

@@ -177,16 +177,27 @@ async function loadVardiyaData() {
     
     try {
         console.log(`📊 ${motor} motoru için ${tarih} tarih ${vardiya} vardiya verileri yükleniyor...`);
+        console.log(`🔍 Parametreler: motor=${motor}, tarih=${tarih}, vardiya=${vardiya}`);
         
         const result = await getMotorRecordsByMotorAndDate(motor, tarih);
+        console.log(`📊 API sonucu:`, result);
+        
         if (!result.success) {
-            console.error('Veriler yüklenemedi:', result.error);
+            console.error('❌ Veriler yüklenemedi:', result.error);
+            console.error('❌ Hata detayı:', JSON.stringify(result));
             return;
         }
         
         const records = result.data;
-        const tbody = document.getElementById('motorVeriTableBody');
-        if (!tbody) return;
+        console.log(`📊 Gelen kayıt sayısı: ${records ? records.length : 0}`);
+        console.log(`📊 Gelen kayıtlar:`, records);
+        
+        const tbody = document.getElementById('vardiyaTableBody');
+        console.log(`🔍 Tablo tbody bulundu mu:`, tbody);
+        if (!tbody) {
+            console.error('❌ vardiyaTableBody bulunamadı!');
+            return;
+        }
         
         // Mevcut satırları temizle
         tbody.innerHTML = '';
@@ -199,38 +210,87 @@ async function loadVardiyaData() {
         };
         
         const saatler = vardiyaSaatleri[vardiya] || [];
+        console.log(`🔍 Vardiya saatleri:`, saatler);
+        console.log(`🔍 Gelen kayıtların saatleri:`, records.map(r => r.saat));
+        
         let kayitSayisi = 0;
         
         saatler.forEach(saat => {
             const record = records.find(r => r.saat === saat);
+            console.log(`🔍 Saat: ${saat}, Kayıt bulundu mu:`, !!record);
+            if (record) {
+                console.log(`🔍 Kayıt detayı:`, JSON.stringify(record, null, 2));
+                console.log(`🔍 Alanlar:`, Object.keys(record));
+                console.log(`🔍 Değerler:`, {
+                    saat: record.saat,
+                    motor: record.motor,
+                    durum: record.durum,
+                    jenYatakSicaklikDE: record.jenYatakSicaklikDE,
+                    jenYatakSicaklikNDE: record.jenYatakSicaklikNDE,
+                    sogutmaSuyuSicaklik: record.sogutmaSuyuSicaklik,
+                    sogutmaSuyuBasinc: record.sogutmaSuyuBasinc,
+                    yagSicaklik: record.yagSicaklik,
+                    yagBasinc: record.yagBasinc,
+                    sarjSicaklik: record.sarjSicaklik,
+                    sarjBasinc: record.sarjBasinc,
+                    gazRegulatoru: record.gazRegulatoru,
+                    makineDairesiSicaklik: record.makineDairesiSicaklik,
+                    karterBasinc: record.karterBasinc,
+                    onKamaraFarkBasinc: record.onKamaraFarkBasinc,
+                    sargiSicaklik1: record.sargiSicaklik1,
+                    sargiSicaklik2: record.sargiSicaklik2,
+                    sargiSicaklik3: record.sargiSicaklik3
+                });
+            }
             const row = document.createElement('tr');
             
             if (record) {
                 kayitSayisi++;
-                row.innerHTML = `
-                    <td>${record.tarih}</td>
-                    <td>${record.vardiya}</td>
-                    <td>${record.saat}</td>
-                    <td>${record.motor}</td>
-                    <td>${record.jenYatakSicaklikDE || '-'}</td>
-                    <td>${record.jenYatakSicaklikNDE || '-'}</td>
-                    <td>${record.sogutmaSuyuSicaklik || '-'}</td>
-                    <td>${record.sogutmaSuyuBasinc || '-'}</td>
-                    <td>${record.yagSicaklik || '-'}</td>
-                    <td>${record.yagBasinc || '-'}</td>
-                    <td>${record.sarjSicaklik || '-'}</td>
-                    <td>${record.sarjBasinc || '-'}</td>
-                    <td>${record.gazRegulatoru || '-'}</td>
-                    <td>${record.makineDairesiSicaklik || '-'}</td>
-                    <td>${record.karterBasinc || '-'}</td>
-                    <td>${record.onKamaraFarkBasinc || '-'}</td>
-                    <td>${record.sargiSicaklik1 || '-'}</td>
-                    <td>${record.sargiSicaklik2 || '-'}</td>
-                    <td>${record.sargiSicaklik3 || '-'}</td>
-                    <td>${record.durum}</td>
-                    <td>${record.kaydeden}</td>
-                    <td>${record.kayitTarihi}</td>
-                `;
+                
+                // Gelen verideki tüm alanları kontrol et
+                console.log(`🔍 Gelen tüm alanlar:`, Object.keys(record));
+                console.log(`🔍 Alan değerleri:`, record);
+                
+                // Eğer motor alanları yoksa, gelen veriyi olduğu gibi göster
+                const hasMotorFields = record.jenYatakSicaklikDE !== undefined || 
+                                   record.sogutmaSuyuSicaklik !== undefined ||
+                                   record.yagSicaklik !== undefined;
+                
+                if (!hasMotorFields) {
+                    // Motor alanları yoksa, gelen veriyi göster
+                    row.innerHTML = `
+                        <td>${record.saat}</td>
+                        <td>${record.motor}</td>
+                        <td colspan="16" style="text-align: center; background-color: #fff3cd;">
+                            <strong>Veri Yapısı Uyuşmuyor:</strong><br>
+                            Gelen alanlar: ${Object.keys(record).join(', ')}<br>
+                            Beklenen: jenYatakSicaklikDE, sogutmaSuyuSicaklik, etc.
+                        </td>
+                        <td>${record.durum}</td>
+                    `;
+                } else {
+                    // Normal motor verisi göster
+                    row.innerHTML = `
+                        <td>${record.saat}</td>
+                        <td>${record.motor}</td>
+                        <td>${record.jenYatakSicaklikDE || '-'}</td>
+                        <td>${record.jenYatakSicaklikNDE || '-'}</td>
+                        <td>${record.sogutmaSuyuSicaklik || '-'}</td>
+                        <td>${record.sogutmaSuyuBasinc || '-'}</td>
+                        <td>${record.yagSicaklik || '-'}</td>
+                        <td>${record.yagBasinc || '-'}</td>
+                        <td>${record.sarjSicaklik || '-'}</td>
+                        <td>${record.sarjBasinc || '-'}</td>
+                        <td>${record.gazRegulatoru || '-'}</td>
+                        <td>${record.makineDairesiSicaklik || '-'}</td>
+                        <td>${record.karterBasinc || '-'}</td>
+                        <td>${record.onKamaraFarkBasinc || '-'}</td>
+                        <td>${record.sargiSicaklik1 || '-'}</td>
+                        <td>${record.sargiSicaklik2 || '-'}</td>
+                        <td>${record.sargiSicaklik3 || '-'}</td>
+                        <td>${record.durum}</td>
+                    `;
+                }
                 
                 // Motor çalışmıyorsa satırı kırmızı yap
                 if (record.durum === 'MOTOR ÇALIŞMIYOR') {
@@ -239,18 +299,18 @@ async function loadVardiyaData() {
                 }
             } else {
                 row.innerHTML = `
-                    <td>${tarih}</td>
-                    <td>${vardiya}</td>
                     <td>${saat}</td>
                     <td>${motor}</td>
-                    <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>
+                    <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>
                 `;
             }
             
             tbody.appendChild(row);
+            console.log(`🔍 Satır tabloya eklendi:`, row);
         });
         
         console.log(`✅ ${kayitSayisi} kayıt yüklendi`);
+        console.log(`🔍 Tablodaki toplam satır sayısı:`, tbody.children.length);
         
     } catch (error) {
         console.error('Vardiya verileri yüklenirken hata:', error);
@@ -1328,109 +1388,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Vardiya tablosunu doldur - sadece seçili motorun verileri
-    async function loadVardiyaData() {
-        const vardiya = vardiyaSecimi.value;
-        const tarih = tarihSecimi.value;
-        const motor = selectedMotor; // Seçili motoru al
         
-        if (!vardiya || !tarih || !motor) return;
-        
-        const tableBody = document.getElementById('vardiyaTableBody');
-        const noDataMessage = document.getElementById('noDataMessage');
-        
-        if (!tableBody) return;
-        
-        // Tabloyu temizle
-        tableBody.innerHTML = '';
-        
-        try {
-            // Tüm kayıtları getir
-            const result = await getAllMotorRecords();
-            
-            if (!result.success || !result.data || result.data.length === 0) {
-                if (noDataMessage) noDataMessage.style.display = 'block';
-                return;
-            }
-            
-            // Tarih formatını normalize et
-            let searchTarih = tarih;
-            if (searchTarih.includes('-')) {
-                const parts = searchTarih.split('-');
-                searchTarih = `${parts[2]}.${parts[1]}.${parts[0]}`;
-            }
-            
-            // Vardiya aralığındaki ve seçili motorun kayıtlarını filtrele
-            const filteredRecords = result.data.filter(record => {
-                const recordTarih = record.tarih || '';
-                const recordSaat = record.saat || '';
-                const recordMotor = record.motor || '';
-                return recordTarih === searchTarih && 
-                       kayitVardiyaAraligindaMi(recordSaat, vardiya) &&
-                       recordMotor === motor; // Sadece seçili motor
-            });
-            
-            // Saate göre sırala
-            filteredRecords.sort((a, b) => {
-                const saatA = getSaatDegeri(a.saat) || 0;
-                const saatB = getSaatDegeri(b.saat) || 0;
-                return saatA - saatB;
-            });
-            
-            if (filteredRecords.length === 0) {
-                if (noDataMessage) {
-                    noDataMessage.textContent = `${motor} motoru için bu vardiya saat aralığında henüz kayıt bulunmamaktadır.`;
-                    noDataMessage.style.display = 'block';
-                }
-                return;
-            }
-            
-            if (noDataMessage) noDataMessage.style.display = 'none';
-            
-            // Tabloyu doldur
-            filteredRecords.forEach(record => {
-                const row = document.createElement('tr');
-                
-                // Motor çalışmıyor durumunda sınıf ekle
-                if (record.durum === 'MOTOR ÇALIŞMIYOR') {
-                    row.classList.add('motor-calismiyor');
-                }
-                
-                row.innerHTML = `
-                    <td>${record.saat || '-'}</td>
-                    <td>${record.motor || '-'}</td>
-                    <td>${record.jenYatakSicaklikDE || '-'}</td>
-                    <td>${record.jenYatakSicaklikNDE || '-'}</td>
-                    <td>${record.sogutmaSuyuSicaklik || '-'}</td>
-                    <td>${record.sogutmaSuyuBasinc || '-'}</td>
-                    <td>${record.yagSicaklik || '-'}</td>
-                    <td>${record.yagBasinc || '-'}</td>
-                    <td>${record.sarjSicaklik || '-'}</td>
-                    <td>${record.sarjBasinc || '-'}</td>
-                    <td>${record.gazRegulatoru || '-'}</td>
-                    <td>${record.makineDairesiSicaklik || '-'}</td>
-                    <td>${record.karterBasinc || '-'}</td>
-                    <td>${record.onKamaraFarkBasinc || '-'}</td>
-                    <td>${record.sargiSicaklik1 || '-'}</td>
-                    <td>${record.sargiSicaklik2 || '-'}</td>
-                    <td>${record.sargiSicaklik3 || '-'}</td>
-                    <td class="${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'durum-calismiyor' : 'durum-normal'}">
-                        ${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'ÇALIŞMIYOR' : 'NORMAL'}
-                    </td>
-                `;
-                
-                tableBody.appendChild(row);
-            });
-            
-        } catch (error) {
-            console.error('Vardiya verileri yüklenirken hata:', error);
-            if (noDataMessage) {
-                noDataMessage.textContent = 'Veriler yüklenirken bir hata oluştu.';
-                noDataMessage.style.display = 'block';
-            }
-        }
-    }
-    
     // Vardiya veya tarih değiştiğinde tabloyu güncelle
     vardiyaSecimi.addEventListener('change', async function() {
         guncelleVardiyaBilgisi();
