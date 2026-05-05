@@ -325,7 +325,7 @@ async function loadVardiyaData() {
                 <td>${sargiSicaklik1}</td>
                 <td>${sargiSicaklik2}</td>
                 <td>${sargiSicaklik3}</td>
-                <td class="${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'durum-calismiyor' : 'durum-normal'}">${record.durum}</td>
+                <td class="${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'durum-calismiyor' : 'durum-normal'}">${record.durum === 'MOTOR ÇALIŞMIYOR' ? 'ÇALIŞMIYOR' : 'NORMAL'}</td>
             `;
             tbody.appendChild(row);
         });
