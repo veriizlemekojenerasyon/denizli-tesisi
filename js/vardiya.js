@@ -438,16 +438,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Tarih sıfırla butonu
     tarihSifirlaBtn.addEventListener('click', function() {
-        // Tarihleri varsayılan değerlere sıfırla (son 30 gün)
-        const otuzGunOnce = new Date();
-        otuzGunOnce.setDate(otuzGunOnce.getDate() - 30);
-        const baslangicYear = otuzGunOnce.getFullYear();
-        const baslangicMonth = String(otuzGunOnce.getMonth() + 1).padStart(2, '0');
-        const baslangicDay = String(otuzGunOnce.getDate()).padStart(2, '0');
-        baslangicTarihInput.value = `${baslangicDay}.${baslangicMonth}.${baslangicYear}`;
-        bitisTarihInput.value = `${day}.${month}.${year}`;
+        // Tarih alanlarını temizle
+        baslangicTarihInput.value = '';
+        bitisTarihInput.value = '';
         
-        // Kayıtları yeniden yükle
         haftalikVardiyaKayitlariniGoster();
     });
 
@@ -748,7 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Loading mesajı göster
         haftalikVardiyaTableBody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align: center; color: #6c757d; padding: 20px;">
+                <td colspan="7" style="text-align: center; color: #6c757d; padding: 20px;">
                     Kayıtlar yükleniyor...
                 </td>
             </tr>
@@ -766,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!result.success) {
                 haftalikVardiyaTableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; color: #e74c3c; padding: 20px;">
+                        <td colspan="7" style="text-align: center; color: #e74c3c; padding: 20px;">
                             Kayıtlar yüklenemedi: ${result.error || 'Bilinmeyen hata'}
                         </td>
                     </tr>
@@ -782,7 +776,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (tumIslemler.length === 0) {
                 haftalikVardiyaTableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; color: #6c757d; padding: 20px;">
+                        <td colspan="7" style="text-align: center; color: #6c757d; padding: 20px;">
                             Vardiya kaydı bulunamadı.
                         </td>
                     </tr>
@@ -823,28 +817,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 }
             } else {
-                // Varsayılan: Son 30 gün
-                const otuzGunOnce = new Date();
-                otuzGunOnce.setDate(otuzGunOnce.getDate() - 30);
-                
-                filtrelenmisKayitlar = tumIslemler.filter(vardiya => {
-                    const tarihParts = vardiya.tarih.split('.');
-                    if (tarihParts.length === 3) {
-                        const vardiyaTarihi = new Date(tarihParts[2], tarihParts[1] - 1, tarihParts[0]);
-                        return vardiyaTarihi >= otuzGunOnce;
-                    }
-                    return false;
-                });
+                // Tarih seçilmediyse tüm kayıtları göster
+                filtrelenmisKayitlar = tumIslemler;
             }
             
             if (filtrelenmisKayitlar.length === 0) {
                 const mesaj = baslangicTarihInput && bitisTarihInput 
                     ? 'Seçilen tarih aralığında vardiya kaydı bulunamadı.' 
-                    : 'Son 30 günde vardiya kaydı bulunamadı.';
+                    : 'Tarih aralığı seçin veya kayıt bulunamadı.';
                     
                 haftalikVardiyaTableBody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align: center; color: #6c757d; padding: 20px;">
+                        <td colspan="7" style="text-align: center; color: #6c757d; padding: 20px;">
                             ${mesaj}
                         </td>
                     </tr>
@@ -860,14 +844,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     '24-08': '24:00 - 08:00'
                 };
                 
-                // Yapılan işlemleri formatla (VardiyaIslemleri sheet'inden)
-                let yapilanIslemlerText = '-';
+                // İşlem detaylarını formatla (VardiyaIslemleri sheet'inden)
                 let islemDetaylariText = '-';
                 const islemler = vardiyaIslemleriMap.get(vardiya.id) || [];
                 
                 if (islemler.length > 0) {
-                    yapilanIslemlerText = islemler.map(i => i.islem).join(', ');
-                    islemDetaylariText = islemler.map(i => `${i.islem} (${i.saat})`).join(' | ');
+                    islemDetaylariText = islemler.map(i => `${i.islem} (${i.zaman})`).join(' | ');
                 }
                 
                 tr.innerHTML = `
@@ -875,9 +857,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${vardiyaAdiMap[vardiya.vardiya] || vardiya.vardiya}</td>
                     <td>${vardiya.personel}</td>
                     <td>${vardiya.yardimciOperator || '-'}</td>
-                    <td>${vardiya.baslangic}</td>
-                    <td>${vardiya.bitis || '-'}</td>
-                    <td>${yapilanIslemlerText}</td>
+                    <td>${vardiya.baslangicSaati || '-'}</td>
+                    <td>${vardiya.bitisSaati || '-'}</td>
                     <td>${islemDetaylariText}</td>
                 `;
                 
@@ -887,7 +868,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Vardiya kayıtları yükleme hatası:', error);
             haftalikVardiyaTableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: #e74c3c; padding: 20px;">
+                    <td colspan="7" style="text-align: center; color: #e74c3c; padding: 20px;">
                         Bağlantı hatası! Kayıtlar yüklenemedi.
                     </td>
                 </tr>
