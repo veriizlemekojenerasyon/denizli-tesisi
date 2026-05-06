@@ -4,7 +4,7 @@
  */
 
 const KojenMotorSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwQZqHx365I8jZOBm21NMjTudKjReXxj440cQ5SWlj8azRSPCEwAlUS5kjx4CeJzySS/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycby72V6akhhNdQpKzwx_32IwpkobJhIO7QzR_fkeek1_VdnwP3T_Wmm2dAc9N8ADYrU/exec'
 };
 
 /**
