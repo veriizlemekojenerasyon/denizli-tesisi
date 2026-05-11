@@ -1034,6 +1034,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 input.disabled = false;
             });
             
+            // 🔥 VARDİYA TABLOSUNU SIFIRLA
+            const tbody = document.getElementById('vardiyaTableBody');
+            if (tbody) {
+                tbody.innerHTML = '';
+            }
+            const noDataMessage = document.getElementById('noDataMessage');
+            if (noDataMessage) {
+                noDataMessage.style.display = 'block';
+            }
+            
             showMessage(`${selectedMotor} motoru seçildi!`, 'info');
             
             // Vardiya verilerini güncelle (seçili motor için)
@@ -1117,7 +1127,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tarih: data.tarih,
                 vardiya: data.vardiya,
                 saat: data.saat,
-                kaydeden: 'Admin',
+                kaydeden: getCurrentUserName(),
                 durum: 'NORMAL'
             };
             
@@ -1214,6 +1224,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Seçili motoru güncelle
                 selectedMotor = nextMotor;
                 
+                // 🔥 VARDİYA TABLOSUNU SIFIRLA
+                const tbody = document.getElementById('vardiyaTableBody');
+                if (tbody) {
+                    tbody.innerHTML = '';
+                }
+                const noDataMessage = document.getElementById('noDataMessage');
+                if (noDataMessage) {
+                    noDataMessage.style.display = 'block';
+                }
+                
                 showMessage(`Otomatik geçiş: ${nextMotor} motoru seçildi!`, 'info');
                 
                 // Vardiya verilerini güncelle
@@ -1294,7 +1314,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 tarih: data.tarih,
                 vardiya: data.vardiya,
                 saat: data.saat,
-                kaydeden: 'Admin',
+                kaydeden: getCurrentUserName(),
                 durum: 'MOTOR ÇALIŞMIYOR'
             };
             
@@ -1719,9 +1739,15 @@ async function handleModalKaydet() {
         
         if (kayitEdilecekler.length === 0) {
             console.log('⏭️ Kayıt yapılacak şey yok, işlem tamamlandı');
-            showMessage('Tüm seçili saatler için zaten kayıt mevcut!', 'info');
+            showMessage('Tüm seçili saatler için zaten kayıt mevcut! Modal kapatılıyor...', 'info');
             kaydetBtn.disabled = false;
             kaydetBtn.textContent = originalText;
+            
+            // Modalı otomatik kapat
+            setTimeout(() => {
+                closeMotorCalismiyorModal();
+            }, 1500);
+            
             return;
         }
         
@@ -1743,30 +1769,62 @@ async function handleModalKaydet() {
             }
         });
         
-        // 🚀 SADECE ARKA PLAN KAYIT SİSTEMİ - İşlemleri kuyruğa ekle
-        const eklenenIslemler = [];
+        // 🚀 HIZLI ÇOKLU KAYIT SİSTEMİ - Tüm verileri tek seferde gönder
+        console.log('🚀 Çoklu kayıt sistemi başlatılıyor...');
         
-        kayitEdilecekler.forEach(({ motor, saat }) => {
+        // Kayıt verilerini hazırla
+        const recordsToSave = kayitEdilecekler.map(({ motor, saat }) => {
             const sonKayit = sonKayitlar[motor] || {};
             
-            const islemId = kayitKuyrugunaEkle({
+            return {
                 motor: motor,
                 tarih: modalTarih,
                 vardiya: modalVardiya,
                 saat: saat,
-                kaydeden: getCurrentUserName(),
+                jenYatakSicaklikDE: sonKayit.jenYatakSicaklikDE || '0,00',
+                jenYatakSicaklikGE: sonKayit.jenYatakSicaklikGE || '0,00',
+                sogutmaSuyuSicaklik: sonKayit.sogutmaSuyuSicaklik || '0,00',
+                sogutmaSuyuBasinc: sonKayit.sogutmaSuyuBasinc || '0,00',
+                yagSicaklik: sonKayit.yagSicaklik || '0,00',
+                yagBasinc: sonKayit.yagBasinc || '0,00',
+                sarjSicaklik: sonKayit.sarjSicaklik || '0,00',
+                sarjBasinc: sonKayit.sarjBasinc || '0,00',
+                gazRegulator: sonKayit.gazRegulator || '0,00',
+                makineDairesiSicaklik: sonKayit.makineDairesiSicaklik || '0,00',
+                karterBasinc: sonKayit.karterBasinc || '0,00',
+                onKamaraFarkBasinc: sonKayit.onKamaraFarkBasinc || '0,00',
+                sargiSicaklik1: sonKayit.sargiSicaklik1 || '0,00',
+                sargiSicaklik2: sonKayit.sargiSicaklik2 || '0,00',
+                sargiSicaklik3: sonKayit.sargiSicaklik3 || '0,00',
                 not: modalNot || 'Motor çalışmıyor',
-                sonKayit: sonKayit
-            });
-            
-            eklenenIslemler.push(islemId);
+                kullanici: getCurrentUserName()
+            };
         });
         
-        // Modalı hemen kapat - kullanıcı devam edebilir
-        closeMotorCalismiyorModal();
-        
-        // Başlangıç mesajı
-        showMessage(`${kayitEdilecekler.length} kayıt arka plana eklendi! İşlem #${eklenenIslemler[0]} - #${eklenenIslemler[eklenenIslemler.length-1]}`, 'success');
+        try {
+            // Çoklu kayıt gönder
+            const bulkResult = await addMultipleMotorRecords(recordsToSave);
+            
+            if (bulkResult.success) {
+                console.log(`✅ ${bulkResult.addedCount}/${bulkResult.totalCount} kayıt başarıyla eklendi`);
+                showMessage(`${bulkResult.addedCount} kayıt başarıyla eklendi!`, 'success');
+                
+                // Cache'i temizle
+                recordMap.clear();
+                cachedRecords = [];
+                
+                // Formu kapat
+                closeMotorCalismiyorModal();
+                
+            } else {
+                console.error('❌ Çoklu kayıt hatası:', bulkResult.error);
+                showMessage('Kayıt hatası: ' + bulkResult.error, 'error');
+            }
+            
+        } catch (error) {
+            console.error('❌ Çoklu kayıt gönderme hatası:', error);
+            showMessage('Kayıt gönderilemedi: ' + error.message, 'error');
+        }
         
         // Durum güncellemelerini göster
         const durumInterval = setInterval(() => {

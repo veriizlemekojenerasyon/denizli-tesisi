@@ -49,6 +49,9 @@ function handleRequest(e) {
       case 'checkMultipleRecords':
         result = checkMultipleRecords(e.parameter.data);
         break;
+      case 'addMultipleRecords':
+        result = addMultipleRecords(e.parameter.data);
+        break;
       case 'getLastRecords':
         result = getLastRecords(parseInt(e.parameter.count) || 50);
         break;
@@ -88,10 +91,11 @@ function getOrCreateSheet(motor) {
       'TOPLAM AKTİF ENERJİ', 'ÇALIŞMA SAATİ', 'KALKIŞ SAYISI',
       'Durum', 'Kaydeden', 'Kayıt Tarihi'
     ];
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]).setFontWeight('bold');
+    headerRange.setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
     
     console.log('📄 Yeni enerji sayfası oluşturuldu: ' + sheetName);
-    headerRange.setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
     
     // Sütun genişliklerini ayarla
     sheet.setColumnWidth(1, 100);  // Tarih
@@ -176,7 +180,7 @@ function addRecord(data) {
     var tarihObj;
     if (formattedTarih.includes('.')) {
       var tarihParts = formattedTarih.split('.');
-      tarihObj = new Date(tarihParts[2], tarihParts[1] - 1, tarihParts[1]);
+      tarihObj = new Date(tarihParts[2], tarihParts[1] - 1, tarihParts[0]);
     } else {
       tarihObj = new Date(formattedTarih);
     }
@@ -548,4 +552,135 @@ function findInsertPosition(sheet, tarih, saat) {
   
   // En sona ekle
   return lastRow + 1;
+}
+
+// Çoklu kayıt ekleme
+function addMultipleRecords(dataString) {
+  try {
+    // Verileri parse et
+    var records = JSON.parse(dataString);
+    if (!Array.isArray(records)) {
+      return { success: false, error: 'Veri formatı hatalı' };
+    }
+    
+    var addedRecords = [];
+    var errors = [];
+    var motorSheets = {}; // Motor sayfalarını sakla
+    
+    // Her bir kaydı ekle
+    for (var i = 0; i < records.length; i++) {
+      try {
+        var record = records[i];
+        
+        // Motor için doğru sayfayı al ve sakla
+        var sheet = getOrCreateSheet(record.motor);
+        motorSheets[record.motor] = sheet;
+        
+        // Tarih formatını kontrol et (Türkçe formatında tut)
+        var tarih = record.tarih;
+        // Gelen tarih zaten dd.MM.yyyy formatında olduğu gibi kullan
+        
+        // Satır verilerini hazırla (Excel sütunlarına göre)
+        var rowData = [
+          tarih || '',                                     // Tarih
+          record.vardiya || '',                            // Vardiya
+          record.saat || '',                               // Saat
+          record.motor || '',                              // Motor
+          record.aydemVoltaji || '0',                      // L1-L2 AYDEM VOLTAJI
+          record.aktifGuc || '0',                          // (P) AKTİF GÜÇ
+          record.reaktifGuc || '0',                        // (Q) REAKTİF GÜÇ
+          record.cosPhi || '0',                            // Cos φ
+          record.ortAkim || '0',                           // ORT.AKIM
+          record.ortGerilim || '0',                        // ORT.GERİLİM
+          record.notrAkim || '0',                          // NÖTR AKIMI (LN)
+          record.tahrikGerilimi || '0',                    // TAHRİK GERİLİMİ (UE)
+          record.toplamAktifEnerji || '0',                 // TOPLAM AKTİF ENERJİ
+          record.calismaSaati || '0',                      // ÇALIŞMA SAATİ
+          record.kalkisSayisi || '0',                      // KALKIŞ SAYISI
+          record.not || 'Motor çalışmıyor',               // Durum
+          record.kullanici || '',                          // Kaydeden
+          new Date().toLocaleString('tr-TR')               // Kayıt Tarihi
+        ];
+        
+        // Satırı ekle
+        sheet.appendRow(rowData);
+        addedRecords.push({
+          motor: record.motor,
+          tarih: record.tarih,
+          saat: record.saat,
+          row: sheet.getLastRow()
+        });
+        
+      } catch (recordError) {
+        errors.push({
+          record: records[i],
+          error: recordError.toString()
+        });
+      }
+    }
+    
+    console.log('📊 Çoklu enerji kayıt sonucu: ' + addedRecords.length + ' eklendi, ' + errors.length + ' hata');
+    
+    // 🔥 Her motor için tarihleri renklendir
+    for (var motorName in motorSheets) {
+      var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
+      colorizeDates(motorSheets[motorName], motorRecords);
+    }
+    
+    return {
+      success: true,
+      addedCount: addedRecords.length,
+      totalCount: records.length,
+      addedRecords: addedRecords,
+      errors: errors
+    };
+    
+  } catch (error) {
+    console.error('Çoklu enerji kayıt ekleme hatası: ' + error.toString());
+    return { success: false, error: error.toString() };
+  }
+}
+
+// 🔥 Tarihleri renklendirme fonksiyonu
+function colorizeDates(sheet, addedRecords) {
+  try {
+    // Tarihleri grupla
+    var dateGroups = {};
+    for (var i = 0; i < addedRecords.length; i++) {
+      var record = addedRecords[i];
+      var tarih = record.tarih;
+      if (!dateGroups[tarih]) {
+        dateGroups[tarih] = [];
+      }
+      dateGroups[tarih].push(record.row);
+    }
+    
+    // Her tarih için rastgele renk atayıp boyala
+    for (var tarih in dateGroups) {
+      var rows = dateGroups[tarih];
+      var color = getRandomColor();
+      
+      for (var j = 0; j < rows.length; j++) {
+        var row = rows[j];
+        // Tüm satırı boyala (18 sütun)
+        var range = sheet.getRange(row, 1, 1, 18);
+        range.setBackground(color);
+      }
+    }
+    
+    console.log('🎨 Enerji tarihler renklendirildi: ' + Object.keys(dateGroups).length + ' farklı tarih');
+  } catch (error) {
+    console.error('Enerji renklendirme hatası: ' + error.toString());
+  }
+}
+
+// Rastgele pastel renk üret
+function getRandomColor() {
+  var colors = [
+    '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF',
+    '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F0E68C', '#DDA0DD',
+    '#98FB98', '#FFDAB9', '#E6E6FA', '#F0FFF0', '#FFF0F5',
+    '#FFE4E1', '#E0FFFF', '#F5F5DC', '#FFEFD5', '#FAEBD7'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
 }

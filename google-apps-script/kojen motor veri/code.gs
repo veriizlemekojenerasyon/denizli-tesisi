@@ -49,6 +49,9 @@ function handleRequest(e) {
       case 'checkMultipleRecords':
         result = checkMultipleRecords(e.parameter.data);
         break;
+      case 'addMultipleRecords':
+        result = addMultipleRecords(e.parameter.data);
+        break;
       case 'getLastRecords':
         result = getLastRecords(parseInt(e.parameter.count) || 50);
         break;
@@ -526,4 +529,139 @@ function getLastRecords(count) {
   } catch (error) {
     return { success: false, error: error.toString() };
   }
+}
+
+// Çoklu kayıt ekleme
+function addMultipleRecords(dataString) {
+  try {
+    // Verileri parse et
+    var records = JSON.parse(dataString);
+    if (!Array.isArray(records)) {
+      return { success: false, error: 'Veri formatı hatalı' };
+    }
+    
+    var addedRecords = [];
+    var errors = [];
+    var motorSheets = {}; // Motor sayfalarını sakla
+    
+    // Her bir kaydı ekle
+    for (var i = 0; i < records.length; i++) {
+      try {
+        var record = records[i];
+        
+        // Motor için doğru sayfayı al ve sakla
+        var sheet = getOrCreateSheet(record.motor);
+        motorSheets[record.motor] = sheet;
+        
+        // Tarih formatını kontrol et (Türkçe formatında tut)
+        var tarih = record.tarih;
+        // Gelen tarih zaten dd.MM.yyyy formatında olduğu gibi kullan
+        
+        // Satır verilerini hazırla (Excel sütunlarına göre)
+        var rowData = [
+          tarih || '',                                     // Tarih (2026-05-11)
+          record.vardiya || '',                            // Vardiya (08-16)
+          record.saat || '',                               // Saat (08:00)
+          record.motor || '',                              // Motor (GM-1)
+          record.jenYatakSicaklikDE || '0',                // JEN. YATAK SIC. (DE)
+          record.jenYatakSicaklikGE || '0',                // JEN. YATAK SIC. (NDE)
+          record.sogutmaSoyuSicaklik || '0',               // SOĞUTMA SUYU SIC.
+          record.sogutmaSoyuBasinc || '0',                 // SOĞUTMA SUYU BAS.
+          record.yagSicaklik || '0',                       // YAĞ SIC.
+          record.yagBasinc || '0',                         // YAĞ BAS.
+          record.sarjSicaklik || '0',                      // ŞARJ SIC.
+          record.sarjBasinc || '0',                        // ŞARJ BAS.
+          record.gazRegulator || '0',                      // GAZ REG. (λ)
+          record.makineDairesiSicaklik || '0',             // MAKİNE DAİRESİ SIC.
+          record.karterBasinc || '0',                      // KARTER BAS.
+          record.onKamaraFarkBasinc || '0',                 // ÖN KAMARA FARK BAS.
+          record.sargiSicaklik1 || '0',                    // SARGI SIC. -1-
+          record.sargiSicaklik2 || '0',                    // SARGI SIC. -2-
+          record.sargiSicaklik3 || '0',                    // SARGI SIC. -3-
+          record.not || 'Motor çalışmıyor',               // Durum
+          record.kullanici || '',                          // Kaydeden
+          new Date().toLocaleString('tr-TR')               // Kayıt Tarihi
+        ];
+        
+        // Satırı ekle
+        sheet.appendRow(rowData);
+        addedRecords.push({
+          motor: record.motor,
+          tarih: record.tarih,
+          saat: record.saat,
+          row: sheet.getLastRow()
+        });
+        
+      } catch (recordError) {
+        errors.push({
+          record: records[i],
+          error: recordError.toString()
+        });
+      }
+    }
+    
+    console.log('📊 Çoklu kayıt sonucu: ' + addedRecords.length + ' eklendi, ' + errors.length + ' hata');
+    
+    // 🔥 Her motor için tarihleri renklendir
+    for (var motorName in motorSheets) {
+      var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
+      colorizeDates(motorSheets[motorName], motorRecords);
+    }
+    
+    return {
+      success: true,
+      addedCount: addedRecords.length,
+      totalCount: records.length,
+      addedRecords: addedRecords,
+      errors: errors
+    };
+    
+  } catch (error) {
+    console.error('Çoklu kayıt ekleme hatası: ' + error.toString());
+    return { success: false, error: error.toString() };
+  }
+}
+
+// 🔥 Tarihleri renklendirme fonksiyonu
+function colorizeDates(sheet, addedRecords) {
+  try {
+    // Tarihleri grupla
+    var dateGroups = {};
+    for (var i = 0; i < addedRecords.length; i++) {
+      var record = addedRecords[i];
+      var tarih = record.tarih;
+      if (!dateGroups[tarih]) {
+        dateGroups[tarih] = [];
+      }
+      dateGroups[tarih].push(record.row);
+    }
+    
+    // Her tarih için rastgele renk atayıp boyala
+    for (var tarih in dateGroups) {
+      var rows = dateGroups[tarih];
+      var color = getRandomColor();
+      
+      for (var j = 0; j < rows.length; j++) {
+        var row = rows[j];
+        // Tüm satırı boyala (21 sütun)
+        var range = sheet.getRange(row, 1, 1, 21);
+        range.setBackground(color);
+      }
+    }
+    
+    console.log('🎨 Tarihler renklendirildi: ' + Object.keys(dateGroups).length + ' farklı tarih');
+  } catch (error) {
+    console.error('Renklendirme hatası: ' + error.toString());
+  }
+}
+
+// Rastgele pastel renk üret
+function getRandomColor() {
+  var colors = [
+    '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF',
+    '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F0E68C', '#DDA0DD',
+    '#98FB98', '#FFDAB9', '#E6E6FA', '#F0FFF0', '#FFF0F5',
+    '#FFE4E1', '#E0FFFF', '#F5F5DC', '#FFEFD5', '#FAEBD7'
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
 }

@@ -1363,3 +1363,199 @@ document.addEventListener('DOMContentLoaded', function() {
         filterSaatByVardiya(this.value);
     });
 });
+
+// 🚀 HIZLI TOPLU ENERJİ KAYIT SİSTEMİ
+async function handleModalKaydet() {
+    const kaydetBtn = document.getElementById('modalKaydetBtn');
+    const originalText = kaydetBtn.textContent;
+    
+    // Seçili motorları ve saatleri al
+    const selectedMotors = Array.from(document.querySelectorAll('input[name="motor"]:checked'))
+        .map(cb => cb.value);
+    const selectedSaatler = Array.from(document.querySelectorAll('input[name="saat"]:checked'))
+        .map(cb => cb.value);
+    
+    if (selectedMotors.length === 0) {
+        showMessage('Lütfen en az bir motor seçin!', 'error');
+        return;
+    }
+    if (selectedSaatler.length === 0) {
+        showMessage('Lütfen en az bir saat seçin!', 'error');
+        return;
+    }
+    
+    // Butonu devre dışı bırak
+    kaydetBtn.disabled = true;
+    kaydetBtn.textContent = '⚠️ KAYDEDİLİYOR...';
+    
+    // 🔥 TARİH FORMAT DÖNÜŞTÜRME - HTML yyyy-MM-dd -> DD.MM.YYYY
+    const modalTarihInput = document.getElementById('modalTarih');
+    let modalTarih = modalTarihInput.value;
+    
+    // HTML formatından display formatına çevir
+    if (modalTarih && modalTarih.includes('-')) {
+        const parts = modalTarih.split('-');
+        modalTarih = `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY
+    }
+    
+    const modalVardiya = document.getElementById('modalVardiya').value;
+    const modalNot = document.getElementById('modalNot').value;
+    
+    console.log('📅 Modal değerleri:', { 
+        modalTarih: modalTarih, 
+        modalTarihRaw: modalTarihInput.value,
+        modalVardiya, 
+        modalNot 
+    });
+    
+    console.log('🚀 HIZLI TOPLU ENERJİ KAYIT SİSTEMİ BAŞLIYOR...');
+    
+    // 🚀 TOPLU KAYIT İÇİN HAZIRLIK
+    const kontrolListesi = [];
+    
+    // Tüm kombinasyonları hazırla
+    for (const motor of selectedMotors) {
+        for (const saat of selectedSaatler) {
+            kontrolListesi.push({ motor, tarih: modalTarih, saat });
+        }
+    }
+    
+    console.log(`📋 ${kontrolListesi.length} enerji kombinasyonu hazırlandı...`);
+    
+    // 🚀 SÜPER HIZLI TOPLU KAYIT KONTROLÜ (TEK API ÇAĞRISI)
+    console.log('🔍 Tüm enerji kayıtları tek seferde kontrol ediliyor...');
+    const bulkKontrolResult = await checkMultipleEnerjiRecords(kontrolListesi);
+    
+    // 🚀 KAYIT EDİLECEKLERİ FİLTRELE
+    const kayitEdilecekler = [];
+    
+    if (bulkKontrolResult.success) {
+        console.log(`📊 Toplu enerji kontrol sonucu: ${bulkKontrolResult.existingCount} var, ${bulkKontrolResult.totalCount - bulkKontrolResult.existingCount} yok`);
+        
+        kontrolListesi.forEach(({ motor, saat }) => {
+            const key = `${motor}|${modalTarih}|${saat}`;
+            const sonuc = bulkKontrolResult.results[key];
+            
+            if (sonuc && !sonuc.exists) {
+                kayitEdilecekler.push({ motor, saat });
+            } else if (sonuc && sonuc.exists) {
+                console.log(`⏭️ ${motor} - ${saat} için kayıt zaten var`);
+            } else {
+                console.log(`❌ ${motor} - ${saat} kontrol hatası`);
+            }
+        });
+    } else {
+        console.log('❌ Toplu enerji kontrol başarısız, tek tek deneniyor...');
+        // Fallback: Tek tek kontrol et
+        for (const motor of selectedMotors) {
+            for (const saat of selectedSaatler) {
+                try {
+                    const existingRecord = await checkExistingEnerjiRecord(motor, modalTarih, saat);
+                    if (!existingRecord.exists) {
+                        kayitEdilecekler.push({ motor, saat });
+                    } else {
+                        console.log(`${motor} - ${modalTarih} ${saat} için kayıt zaten var`);
+                    }
+                } catch (error) {
+                    console.log(`❌ ${motor} - ${saat} kontrol hatası:`, error);
+                }
+            }
+        }
+    }
+    
+    console.log(`📊 ${kayitEdilecekler.length} enerji kaydı yapılacak...`);
+    
+    if (kayitEdilecekler.length === 0) {
+        console.log('⏭️ Kayıt yapılacak şey yok, işlem tamamlandı');
+        showMessage('Tüm seçili saatler için zaten kayıt mevcut! Modal kapatılıyor...', 'info');
+        kaydetBtn.disabled = false;
+        kaydetBtn.textContent = originalText;
+        
+        // Modalı otomatik kapat
+        setTimeout(() => {
+            closeMotorCalismiyorModal();
+        }, 1500);
+        
+        return;
+    }
+    
+    // 🚀 SON KAYIT DEĞERLERİNİ TOPLU AL (PARALEL)
+    console.log('📊 Son enerji kayıt değerleri toplanıyor...');
+    const motorlar = [...new Set(kayitEdilecekler.map(k => k.motor))];
+    const sonKayitSonuclari = await Promise.allSettled(
+        motorlar.map(motor => getLastRecordForMotor(motor))
+    );
+    
+    const sonKayitlar = {};
+    sonKayitSonuclari.forEach((sonuc, index) => {
+        const motor = motorlar[index];
+        if (sonuc.status === 'fulfilled') {
+            sonKayitlar[motor] = sonuc.value || {};
+        } else {
+            sonKayitlar[motor] = {};
+            console.log(`❌ ${motor} son enerji kayıt hatası:`, sonuc.reason);
+        }
+    });
+    
+    // 🚀 HIZLI ÇOKLU KAYIT SİSTEMİ - Tüm verileri tek seferde gönder
+    console.log('🚀 Çoklu enerji kayıt sistemi başlatılıyor...');
+    
+    // Kayıt verilerini hazırla
+    const recordsToSave = kayitEdilecekler.map(({ motor, saat }) => {
+        const sonKayit = sonKayitlar[motor] || {};
+        
+        return {
+            motor: motor,
+            tarih: modalTarih,
+            vardiya: modalVardiya,
+            saat: saat,
+            aydemVoltaji: sonKayit.aydemVoltaji || '0,00',
+            aktifGuc: sonKayit.aktifGuc || '0,00',
+            reaktifGuc: sonKayit.reaktifGuc || '0,00',
+            cosPhi: sonKayit.cosPhi || '0,00',
+            ortAkim: sonKayit.ortAkim || '0,00',
+            ortGerilim: sonKayit.ortGerilim || '0,00',
+            notrAkim: sonKayit.notrAkim || '0,00',
+            tahrikGerilimi: sonKayit.tahrikGerilimi || '0,00',
+            toplamAktifEnerji: sonKayit.toplamAktifEnerji || '0,00',
+            calismaSaati: sonKayit.calismaSaati || '0,00',
+            kalkisSayisi: sonKayit.kalkisSayisi || '0,00',
+            not: modalNot || 'Motor çalışmıyor',
+            kullanici: getCurrentUserName()
+        };
+    });
+    
+    try {
+        // Çoklu kayıt gönder
+        const bulkResult = await addMultipleEnerjiRecords(recordsToSave);
+        
+        if (bulkResult.success) {
+            console.log(`✅ ${bulkResult.addedCount}/${bulkResult.totalCount} kayıt başarıyla eklendi`);
+            showMessage(`${bulkResult.addedCount} enerji kaydı başarıyla eklendi!`, 'success');
+            
+            // Cache'i temizle
+            recordMap.clear();
+            cachedRecords = [];
+            
+            // Formu kapat
+            closeMotorCalismiyorModal();
+            
+            // Vardiya verilerini yenile
+            await loadVardiyaData();
+            
+        } else {
+            console.error('❌ Çoklu enerji kayıt hatası:', bulkResult.error);
+            showMessage('Kayıt hatası: ' + bulkResult.error, 'error');
+        }
+        
+    } catch (error) {
+        console.error('❌ Çoklu kayıt gönderme hatası:', error);
+        showMessage('Kayıt hatası: ' + error.message, 'error');
+    } finally {
+        kaydetBtn.disabled = false;
+        kaydetBtn.textContent = originalText;
+    }
+}
+
+// Window export
+window.handleModalKaydet = handleModalKaydet;

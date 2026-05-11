@@ -4,7 +4,7 @@
  */
 
 const KojenEnerjiSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzL1RDBYT3SCS2Nvn6SY8ySkv7-6XZAbxe9gWenoeNVsoEUPEaO0bfDWQ0eWR7hnQEc/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbx5BRaxLastZUMARa8r1m0i1YIxXV_t1JJ39CuAerIWPy9WK5BLsGCfpTaDX_b0IitsTg/exec'
 };
 
 /**
@@ -224,10 +224,46 @@ async function getAllEnerjiRecords() {
     }
 }
 
+/**
+ * 🚀 ÇOKLU KAYIT SİSTEMİ - Tek seferde çoklu enerji kaydı
+ * @param {Array} records - Kaydedilecek enerji kayıtları
+ * @returns {Promise<Object>} - Kayıt sonuçları
+ */
+async function addMultipleEnerjiRecords(records) {
+    console.log('🚀 Çoklu enerji kaydı gönderiliyor:', records.length, 'kayıt');
+    
+    try {
+        const url = KojenEnerjiSheetsConfig.WEB_APP_URL;
+        
+        const urlParams = new URLSearchParams({
+            action: 'addMultipleRecords',
+            data: JSON.stringify(records)
+        });
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: urlParams.toString()
+        });
+        
+        const result = await response.json();
+        console.log('📊 Çoklu enerji kayıt sonucu:', result);
+        return result;
+        
+    } catch (error) {
+        console.error('❌ Çoklu enerji kayıt hatası:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Global scope'a ekle (HTML dosyasından erişim için)
 window.KojenEnerjiSheetsConfig = KojenEnerjiSheetsConfig;
 window.saveEnerjiToSheets = saveEnerjiToSheets;
 window.checkExistingEnerjiRecord = checkExistingEnerjiRecord;
+window.checkMultipleEnerjiRecords = checkMultipleEnerjiRecords;
 window.getEnerjiRecordsByMotorAndDate = getEnerjiRecordsByMotorAndDate;
 window.getLastEnerjiRecords = getLastEnerjiRecords;
 window.getAllEnerjiRecords = getAllEnerjiRecords;
+window.addMultipleEnerjiRecords = addMultipleEnerjiRecords;

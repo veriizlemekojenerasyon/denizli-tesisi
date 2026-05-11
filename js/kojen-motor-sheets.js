@@ -4,7 +4,7 @@
  */
 
 const KojenMotorSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycby72V6akhhNdQpKzwx_32IwpkobJhIO7QzR_fkeek1_VdnwP3T_Wmm2dAc9N8ADYrU/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycby-FljlItUJ4EQNMuHSoLcbb1_ayeyWjZa28zTG2Tjf-ir8m5b8sJPOiQmVSkintKUAbA/exec'
 };
 
 /**
@@ -230,6 +230,49 @@ async function getAllMotorRecords() {
     }
 }
 
+/**
+ * Çoklu motor kaydı ekleme
+ * @param {Array} records - Kaydedilecek motor verileri dizisi
+ * @returns {Promise<Object>} - Kayıt sonucu
+ */
+async function addMultipleMotorRecords(records) {
+    try {
+        const url = KojenMotorSheetsConfig.WEB_APP_URL;
+        
+        // Verileri JSON string'e çevir
+        const jsonData = JSON.stringify(records);
+        
+        // Parametreleri hazırla
+        const urlParams = new URLSearchParams({
+            action: 'addMultipleRecords',
+            data: jsonData
+        });
+        
+        console.log('🚀 Çoklu motor kaydı gönderiliyor:', records.length, 'kayıt');
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: urlParams.toString()
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('📊 Çoklu motor kayıt sonucu:', result);
+        
+        return result;
+        
+    } catch (error) {
+        console.error('Çoklu motor kayıt hatası:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 // Global scope'a ekle (HTML dosyasından erişim için)
 window.KojenMotorSheetsConfig = KojenMotorSheetsConfig;
 window.saveMotorToSheets = saveMotorToSheets;
@@ -237,3 +280,4 @@ window.checkExistingMotorRecord = checkExistingMotorRecord;
 window.getMotorRecordsByMotorAndDate = getMotorRecordsByMotorAndDate;
 window.getLastMotorRecords = getLastMotorRecords;
 window.getAllMotorRecords = getAllMotorRecords;
+window.addMultipleMotorRecords = addMultipleMotorRecords;
