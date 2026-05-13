@@ -42,12 +42,12 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Buhar verisi config
-    const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzWlHRU5gYiqayNFkv26VB2CPB1w-PYaNQbBAmWoeLW0vQs97HHzY5JdAgHZL9Zv_rRTg/exec';
+    const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnhHSmc5GTuOq8hdqgFM2-FA2XNjRdLHoED5gmjXbmWcYycPNXykdd0ZYTzOI3HNJxKg/exec';
 
     // Sayfa yüklendiğinde verileri göster
-    setTimeout(() => {
+    setTimeout(async () => {
         updateMotorData();
-        loadBuharData(); // Buhar verisini çek
+        await loadBuharData(); // Buhar verisini çek
         updateSummaryData();
         animateProgressBars();
     }, 1000);
@@ -107,8 +107,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Günlük buhar
         const dailySteamEl = document.getElementById('daily-steam-value');
-        if (dailySteamEl) {
-            animateValue(dailySteamEl, 0, summaryData.dailySteam, 1500, ' Ton');
+        if (dailySteamEl && summaryData.dailySteam !== null) {
+            dailySteamEl.textContent = summaryData.dailySteam.toFixed(2) + ' Ton';
         }
 
         // Bekleyen bakım
@@ -137,12 +137,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success && result.data && result.data.length > 0) {
                 const lastRecord = result.data[0];
                 summaryData.dailySteam = parseFloat(lastRecord.buharMiktari) || 0;
-                
-                // Günlük buhar değerini güncelle
-                const dailySteamEl = document.getElementById('daily-steam-value');
-                if (dailySteamEl) {
-                    dailySteamEl.textContent = summaryData.dailySteam.toFixed(2) + ' Ton';
-                }
+            } else {
+                summaryData.dailySteam = null;
             }
         } catch (error) {
             console.error('Buhar verisi yüklenemedi:', error);
