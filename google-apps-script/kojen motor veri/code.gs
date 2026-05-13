@@ -249,6 +249,7 @@ function addRecord(data) {
     var newRow = sheet.getLastRow();
     var dataRange = sheet.getRange(newRow, 1, 1, 22);
     dataRange.setHorizontalAlignment('center');
+    dataRange.setFontSize(10);
     dataRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
     
     // Sayısal sütunları ortala
@@ -535,6 +536,23 @@ function getLastRecords(count) {
 }
 
 // Çoklu kayıt ekleme
+function parseMotorNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  var normalized = String(value).trim();
+  if (normalized.indexOf(',') !== -1) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  }
+  var parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 function addMultipleRecords(dataString) {
   try {
     // Verileri parse et
@@ -566,8 +584,8 @@ function addMultipleRecords(dataString) {
           record.vardiya || '',                            // Vardiya (08-16)
           record.saat || '',                               // Saat (08:00)
           record.motor || '',                              // Motor (GM-1)
-          record.jenYatakSicaklikDE || '0',                // JEN. YATAK SIC. (DE)
-          record.jenYatakSicaklikGE || '0',                // JEN. YATAK SIC. (NDE)
+          parseMotorNumber(record.jenYatakSicaklikDE),     // JEN. YATAK SIC. (DE)
+          parseMotorNumber(record.jenYatakSicaklikNDE),    // JEN. YATAK SIC. (NDE)
           record.sogutmaSoyuSicaklik || '0',               // SOĞUTMA SUYU SIC.
           record.sogutmaSoyuBasinc || '0',                 // SOĞUTMA SUYU BAS.
           record.yagSicaklik || '0',                       // YAĞ SIC.
@@ -585,14 +603,36 @@ function addMultipleRecords(dataString) {
           record.kullanici || '',                          // Kaydeden
           new Date().toLocaleString('tr-TR')               // Kayıt Tarihi
         ];
+        rowData[6] = parseMotorNumber(record.sogutmaSuyuSicaklik);
+        rowData[7] = parseMotorNumber(record.sogutmaSuyuBasinc);
+        rowData[8] = parseMotorNumber(record.yagSicaklik);
+        rowData[9] = parseMotorNumber(record.yagBasinc);
+        rowData[10] = parseMotorNumber(record.sarjSicaklik);
+        rowData[11] = parseMotorNumber(record.sarjBasinc);
+        rowData[12] = parseMotorNumber(record.gazRegulatoru);
+        rowData[13] = parseMotorNumber(record.makineDairesiSicaklik);
+        rowData[14] = parseMotorNumber(record.karterBasinc);
+        rowData[15] = parseMotorNumber(record.onKamaraFarkBasinc);
+        rowData[16] = parseMotorNumber(record.sargiSicaklik1);
+        rowData[17] = parseMotorNumber(record.sargiSicaklik2);
+        rowData[18] = parseMotorNumber(record.sargiSicaklik3);
+        rowData[19] = record.durum || 'MOTOR ÇALIŞMIYOR';
         
         // Satırı ekle
         sheet.appendRow(rowData);
+        var newRow = sheet.getLastRow();
+        var dataRange = sheet.getRange(newRow, 1, 1, 22);
+        dataRange.setHorizontalAlignment('center');
+        dataRange.setFontSize(10);
+        dataRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(newRow, 5, 1, 15).setNumberFormat('0.00');
+        dataRange.setBackground('#ffebee');
+        dataRange.setFontColor('#c62828');
         addedRecords.push({
           motor: record.motor,
           tarih: record.tarih,
           saat: record.saat,
-          row: sheet.getLastRow()
+          row: newRow
         });
         
       } catch (recordError) {
@@ -609,6 +649,19 @@ function addMultipleRecords(dataString) {
     for (var motorName in motorSheets) {
       var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
       colorizeDates(motorSheets[motorName], motorRecords);
+    }
+    for (var j = 0; j < addedRecords.length; j++) {
+      var addedRecord = addedRecords[j];
+      var addedSheet = motorSheets[addedRecord.motor];
+      if (addedSheet) {
+        var addedRange = addedSheet.getRange(addedRecord.row, 1, 1, 22);
+        addedRange.setHorizontalAlignment('center');
+        addedRange.setFontSize(10);
+        addedRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+        addedSheet.getRange(addedRecord.row, 5, 1, 15).setNumberFormat('0.00');
+        addedRange.setBackground('#ffebee');
+        addedRange.setFontColor('#c62828');
+      }
     }
     
     return {

@@ -1595,7 +1595,8 @@ async function handleModalKaydet() {
             toplamAktifEnerji: sonKayit.toplamAktifEnerji || '0,00',
             calismaSaati: sonKayit.calismaSaati || '0,00',
             kalkisSayisi: sonKayit.kalkisSayisi || '0,00',
-            not: modalNot || 'Motor çalışmıyor',
+            durum: 'MOTOR ÇALIŞMIYOR',
+            not: modalNot || '',
             kullanici: getCurrentUserName()
         };
     });

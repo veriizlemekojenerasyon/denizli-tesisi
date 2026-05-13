@@ -240,6 +240,7 @@ function addRecord(data) {
     var newRow = insertRow;
     var dataRange = sheet.getRange(newRow, 1, 1, 18);
     dataRange.setHorizontalAlignment('center');
+    dataRange.setFontSize(10);
     dataRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
     
     // Sayısal sütunları ortala
@@ -558,6 +559,23 @@ function findInsertPosition(sheet, tarih, saat) {
 }
 
 // Çoklu kayıt ekleme
+function parseEnerjiNumber(value) {
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  var normalized = String(value).trim();
+  if (normalized.indexOf(',') !== -1) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  }
+  var parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
 function addMultipleRecords(dataString) {
   try {
     // Verileri parse et
@@ -604,14 +622,34 @@ function addMultipleRecords(dataString) {
           record.kullanici || '',                          // Kaydeden
           new Date().toLocaleString('tr-TR')               // Kayıt Tarihi
         ];
+        rowData[4] = parseEnerjiNumber(record.aydemVoltaji);
+        rowData[5] = parseEnerjiNumber(record.aktifGuc);
+        rowData[6] = parseEnerjiNumber(record.reaktifGuc);
+        rowData[7] = parseEnerjiNumber(record.cosPhi);
+        rowData[8] = parseEnerjiNumber(record.ortAkim);
+        rowData[9] = parseEnerjiNumber(record.ortGerilim);
+        rowData[10] = parseEnerjiNumber(record.notrAkim);
+        rowData[11] = parseEnerjiNumber(record.tahrikGerilimi);
+        rowData[12] = parseEnerjiNumber(record.toplamAktifEnerji);
+        rowData[13] = parseEnerjiNumber(record.calismaSaati);
+        rowData[14] = parseEnerjiNumber(record.kalkisSayisi);
+        rowData[15] = record.durum || 'MOTOR ÇALIŞMIYOR';
         
         // Satırı ekle
         sheet.appendRow(rowData);
+        var newRow = sheet.getLastRow();
+        var dataRange = sheet.getRange(newRow, 1, 1, 18);
+        dataRange.setHorizontalAlignment('center');
+        dataRange.setFontSize(10);
+        dataRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+        sheet.getRange(newRow, 5, 1, 11).setNumberFormat('0.00');
+        dataRange.setBackground('#ffebee');
+        dataRange.setFontColor('#c62828');
         addedRecords.push({
           motor: record.motor,
           tarih: record.tarih,
           saat: record.saat,
-          row: sheet.getLastRow()
+          row: newRow
         });
         
       } catch (recordError) {
@@ -628,6 +666,19 @@ function addMultipleRecords(dataString) {
     for (var motorName in motorSheets) {
       var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
       colorizeDates(motorSheets[motorName], motorRecords);
+    }
+    for (var j = 0; j < addedRecords.length; j++) {
+      var addedRecord = addedRecords[j];
+      var addedSheet = motorSheets[addedRecord.motor];
+      if (addedSheet) {
+        var addedRange = addedSheet.getRange(addedRecord.row, 1, 1, 18);
+        addedRange.setHorizontalAlignment('center');
+        addedRange.setFontSize(10);
+        addedRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+        addedSheet.getRange(addedRecord.row, 5, 1, 11).setNumberFormat('0.00');
+        addedRange.setBackground('#ffebee');
+        addedRange.setFontColor('#c62828');
+      }
     }
     
     return {

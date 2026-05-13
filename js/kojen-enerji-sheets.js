@@ -4,7 +4,7 @@
  */
 
 const KojenEnerjiSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyyqa3CRd7wx61HzlCFXyofGpsRJYAYiEZx3wKEoORYCQgkuLHEbIKARqV2eH7TblLSGA/exec',
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycby_tLx-fjlaOGVJ-Ko7BfKXnymoOQc-IfIXyCd3_0itBr1UpXXc6LofCeqEDLNaqE-cQg/exec',
     EMAIL_ENABLED: true,
     EMAIL_TO: 'mrtcsk0320@gmail.com',
     EMAIL_SUBJECT: 'Kojen Enerji Veri Uyarısı - Kayıt Girilmedi'
