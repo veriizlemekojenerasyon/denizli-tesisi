@@ -161,6 +161,14 @@ h2 {
     margin-bottom: 18px;
 }
 
+.control-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+}
+
+.wide-left {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+}
+
 .panel {
     padding: 18px;
 }
@@ -210,6 +218,97 @@ h2 {
     background: #f8fafc;
     color: var(--text);
     border: 1px solid var(--line);
+}
+
+.health-grid,
+.test-actions,
+.quality-list,
+.user-activity-list,
+.operator-mobile-list {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.health-card,
+.quality-item,
+.activity-item,
+.operator-action-card,
+.test-result {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: #f8fafc;
+}
+
+.health-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.health-card strong,
+.quality-item strong,
+.activity-item strong,
+.operator-action-card strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.health-card p,
+.quality-item p,
+.activity-item p,
+.operator-action-card p,
+.test-result {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.35;
+}
+
+.test-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.test-actions .btn {
+    width: 100%;
+}
+
+.test-result {
+    min-height: 46px;
+}
+
+.quality-item.warn {
+    border-left: 4px solid var(--amber);
+    background: #fffbeb;
+}
+
+.quality-item.danger {
+    border-left: 4px solid var(--red);
+    background: #fef2f2;
+}
+
+.quality-item.ok,
+.operator-action-card.ok,
+.health-card.ok {
+    border-left: 4px solid var(--green);
+}
+
+.operator-action-card.warn,
+.health-card.warn {
+    border-left: 4px solid var(--amber);
+}
+
+.operator-action-card.danger,
+.health-card.danger {
+    border-left: 4px solid var(--red);
+}
+
+.meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
 }
 
 .log-table-wrap {
@@ -285,6 +384,10 @@ h2 {
 
     .status-grid,
     .panel-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .test-actions {
         grid-template-columns: 1fr;
     }
 

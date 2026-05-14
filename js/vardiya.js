@@ -73,6 +73,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Vardiya Google Apps Script URL
     const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnCKSZtDelL04-ZQY3yx_ePSCK9Qy9R0WgFwtsFXj_B6HayfmwM8i_HYU-AAUETleSRA/exec';
+    const VARDIYA_CONTROL_URLS = {
+        saatlik: 'https://script.google.com/macros/s/AKfycbyFwSoehdajKxEGYnw5UWNlPYvpVMl0WJ43i_sl3wsxdD5-AoRAMgIX3-uxXFZUfJTC-Q/exec',
+        motor: 'https://script.google.com/macros/s/AKfycbxNCwKHONUEqjf-Ptc-FuiwFPIYDjd_hLoYBgYs7uosM3eTa2gQZySnUHUQdrE55k2QaQ/exec',
+        enerji: 'https://script.google.com/macros/s/AKfycbw80nNh6VtH3ZTwSPl5Z6W4ekI65Zo1UAm9CTnR4WESugakAnMsPzfFdbemzNgqAsDHhQ/exec',
+        bildirim: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec'
+    };
     
     // Tarih seçicisine otomatik bugünün tarihini atama
     const tarihInput = document.getElementById('tarih');
@@ -160,6 +166,78 @@ document.addEventListener('DOMContentLoaded', function() {
         if (mevcutVardiyaDiv) {
             mevcutVardiyaDiv.style.display = 'none';
         }
+    }
+
+    async function fetchControlJson(baseUrl, params) {
+        const url = new URL(baseUrl);
+        Object.keys(params).forEach(key => url.searchParams.set(key, params[key]));
+        const response = await fetch(url);
+        return response.json();
+    }
+
+    function getShiftHours(vardiya) {
+        if (vardiya === '08-16') return [8, 9, 10, 11, 12, 13, 14, 15];
+        if (vardiya === '16-24') return [16, 17, 18, 19, 20, 21, 22, 23];
+        return [0, 1, 2, 3, 4, 5, 6, 7];
+    }
+
+    function normalizeDateText(value) {
+        const date = parseDateValue(value);
+        return date ? formatDateTR(date) : String(value || '');
+    }
+
+    function recordMatchesDate(record, trDate) {
+        const text = String(record.tarih || '');
+        const parts = trDate.split('.');
+        const iso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        return text.includes(trDate) || text.startsWith(iso);
+    }
+
+    function buildMissingForShift(records, trDate, vardiya, moduleName) {
+        const motors = moduleName === 'saatlik' ? [''] : ['GM-1', 'GM-2', 'GM-3'];
+        const missing = [];
+        getShiftHours(vardiya).forEach(hour => {
+            const saat = `${String(hour).padStart(2, '0')}:00`;
+            motors.forEach(motor => {
+                const exists = records.some(record =>
+                    recordMatchesDate(record, trDate) &&
+                    record.saat === saat &&
+                    (!motor || String(record.motor || '').trim() === motor)
+                );
+                if (!exists) missing.push(motor ? `${saat} ${motor}` : saat);
+            });
+        });
+        return missing;
+    }
+
+    async function runVardiyaClosePrecheck(vardiya) {
+        const trDate = normalizeDateText(vardiya.tarih || tarihInput.value);
+        const selectedShift = vardiya.vardiya || vardiyaSelect.value;
+        const [saatlik, motor, enerji, bildirim] = await Promise.all([
+            fetchControlJson(VARDIYA_CONTROL_URLS.saatlik, { action: 'getLastRecords', count: '48' }),
+            fetchControlJson(VARDIYA_CONTROL_URLS.motor, { action: 'getLastRecords', count: '120' }),
+            fetchControlJson(VARDIYA_CONTROL_URLS.enerji, { action: 'getLastRecords', count: '120' }),
+            fetchControlJson(VARDIYA_CONTROL_URLS.bildirim, { action: 'getAnnouncements', active: 'true' })
+        ]);
+
+        const warnings = [];
+        if (saatlik.success) {
+            const missing = buildMissingForShift(saatlik.data || [], trDate, selectedShift, 'saatlik');
+            if (missing.length) warnings.push(`Saatlik eksik: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}`);
+        }
+        if (motor.success) {
+            const missing = buildMissingForShift(motor.data || [], trDate, selectedShift, 'motor');
+            if (missing.length) warnings.push(`Kojen motor eksik: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}`);
+        }
+        if (enerji.success) {
+            const missing = buildMissingForShift(enerji.data || [], trDate, selectedShift, 'enerji');
+            if (missing.length) warnings.push(`Kojen enerji eksik: ${missing.slice(0, 8).join(', ')}${missing.length > 8 ? '...' : ''}`);
+        }
+        if (bildirim.success) {
+            const critical = (bildirim.data || []).filter(item => item.priority === 'high' && !item.completed);
+            if (critical.length) warnings.push(`Tamamlanmamis kritik duyuru: ${critical.map(item => item.title || item.message).join(', ')}`);
+        }
+        return warnings;
     }
 
     // Vardiya seçicisine otomatik değeri ata (saate göre)
@@ -307,12 +385,28 @@ document.addEventListener('DOMContentLoaded', function() {
             const mevcutVardiya = localStorage.getItem('mevcutVardiya');
             if (mevcutVardiya) {
                 const vardiya = JSON.parse(mevcutVardiya);
+                const teslimOzeti = teslimOzetiInput?.value.trim() || '';
+
+                if (teslimOzeti.length < 10) {
+                    alert('Vardiya bitirmek icin teslim ozeti zorunludur. En az 10 karakterlik kisa ozet yazin.');
+                    teslimOzetiInput?.focus();
+                    return;
+                }
                 
                 // Buton loading durumu
                 vardiyaBitirBtn.textContent = 'BİTİRİLİYOR...';
                 vardiyaBitirBtn.disabled = true;
                 
                 try {
+                    const warnings = await runVardiyaClosePrecheck(vardiya);
+                    if (warnings.length) {
+                        const devam = confirm('Vardiya kapatma on kontrolunde uyarilar var:\n\n' + warnings.join('\n') + '\n\nYine de vardiya bitirilsin mi?');
+                        if (!devam) {
+                            window.SystemAuditLog?.write?.('Vardiya kapatma durduruldu', warnings.join(' | '), 'warn');
+                            return;
+                        }
+                    }
+
                     // Tarih formatını çevir
                     const formattedTarih = toIsoDateParam(vardiya.tarih);
                     
@@ -322,7 +416,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     url.searchParams.append('id', vardiya.id || '');
                     url.searchParams.append('tarih', formattedTarih);
                     url.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
-                    url.searchParams.append('teslimOzeti', teslimOzetiInput?.value.trim() || '');
+                    url.searchParams.append('teslimOzeti', teslimOzeti);
                     url.searchParams.append('devredenIsler', devredenIslerInput?.value.trim() || '');
                     url.searchParams.append('dikkatNotu', dikkatNotuInput?.value.trim() || '');
                     

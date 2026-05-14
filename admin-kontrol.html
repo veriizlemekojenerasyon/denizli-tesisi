@@ -60,6 +60,79 @@
                 </article>
             </section>
 
+            <section class="panel-grid control-grid">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Tetikleyici Sağlığı</h2>
+                            <p>Otomatik eksik kayıt kontrollerinin kurulu olup olmadığını gösterir.</p>
+                        </div>
+                        <button type="button" class="btn ghost" id="installTriggersBtn">Tetikleyicileri Kur</button>
+                    </div>
+                    <div class="health-grid" id="triggerHealthList"></div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Admin Testleri</h2>
+                            <p>Eksik kayıt kontrolünü ve mail akışını manuel dene.</p>
+                        </div>
+                    </div>
+                    <div class="test-actions">
+                        <button type="button" class="btn secondary" data-test-module="saatlik">Saatlik Test</button>
+                        <button type="button" class="btn secondary" data-test-module="motor">Motor Test</button>
+                        <button type="button" class="btn secondary" data-test-module="enerji">Enerji Test</button>
+                        <button type="button" class="btn ghost" id="testMailBtn">Test Maili</button>
+                    </div>
+                    <div class="test-result" id="testResultBox">Test sonucu burada görünecek.</div>
+                </article>
+            </section>
+
+            <section class="panel-grid control-grid">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Vardiya Kapanış Ön Kontrolü</h2>
+                            <p>Vardiya bitmeden önce eksik kayıt ve kritik duyuru durumunu özetler.</p>
+                        </div>
+                    </div>
+                    <div class="check-list" id="shiftCloseChecklist"></div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Mobil Operatör Özeti</h2>
+                            <p>Telefon/tablet ekranı için hızlı aksiyon listesi.</p>
+                        </div>
+                    </div>
+                    <div class="operator-mobile-list" id="operatorMobileList"></div>
+                </article>
+            </section>
+
+            <section class="panel-grid control-grid wide-left">
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Detaylı Kalite Kontrolü</h2>
+                            <p>Limit dışı, tekrar eden veya mantıksız kayıtları ayrıntılı listeler.</p>
+                        </div>
+                    </div>
+                    <div class="quality-list" id="qualityDetailList"></div>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <h2>Kullanıcı İşlem Özeti</h2>
+                            <p>Bu tarayıcıda tutulan son işlem geçmişi.</p>
+                        </div>
+                    </div>
+                    <div class="user-activity-list" id="userActivityList"></div>
+                </article>
+            </section>
+
             <section class="panel">
                 <div class="panel-header">
                     <div>

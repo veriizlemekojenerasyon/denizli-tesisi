@@ -51,6 +51,9 @@ function handleRequest(e) {
       case 'installHourlyMissingRecordTrigger':
         result = installHourlyMissingRecordTrigger();
         break;
+      case 'getTriggerHealth':
+        result = getTriggerHealth();
+        break;
       case 'getSystemLogs':
         result = getSystemLogs(parseInt(e.parameter.count, 10) || 100);
         break;
@@ -478,6 +481,34 @@ function installHourlyMissingRecordTrigger() {
     .create();
 
   return { success: true, message: 'Saatlik eksik kayit tetikleyicisi kuruldu' };
+}
+
+function getTriggerHealth() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var hourlyTriggers = [];
+    for (var i = 0; i < triggers.length; i++) {
+      if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+        hourlyTriggers.push({
+          handler: triggers[i].getHandlerFunction(),
+          source: String(triggers[i].getTriggerSource()),
+          eventType: String(triggers[i].getEventType())
+        });
+      }
+    }
+
+    var logs = getSystemLogs(1);
+    return {
+      success: true,
+      installed: hourlyTriggers.length > 0,
+      triggerCount: hourlyTriggers.length,
+      triggers: hourlyTriggers,
+      lastLog: logs.success && logs.data.length ? logs.data[0] : null,
+      checkedAt: formatDateTimeTR(new Date())
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
 }
 
 function getHourlyCheckTarget(date) {
