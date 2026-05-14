@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const VARDIYA_CONTROL_URLS = {
         saatlik: 'https://script.google.com/macros/s/AKfycbyxw6Lha4yal2pAuPoBLLTBErhmoozphDNcskfjOWhqoveZxQNSvze92gniMhKvn7HWgA/exec',
         motor: 'https://script.google.com/macros/s/AKfycbz33FlBicqkZdRw5UOdagkiZK3leF18QuVPETLK_HGysSYbDAxigev0o_UUnYxuHAr-JA/exec',
-        enerji: 'https://script.google.com/macros/s/AKfycbyyyWPaJli8FCAEDLKJNd2TZbbpzC6jMPlGx0urcZeTesmqzWoL8shCjkeSETwNkoBZpQ/exec',
+        enerji: 'https://script.google.com/macros/s/AKfycbwOaZM8EVOVY1iE-AF1HDY-Eh6LFWUdv0Y2aVJwbys1xEv-HoYofSiVMiorZUInMXQIQA/exec',
         bildirim: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec'
     };
     
