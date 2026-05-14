@@ -42,14 +42,14 @@ async function saveEnerjiToSheets(data) {
         // Motor çalışmıyor durumunda diğer veriler 0, ama son değerler korunur
         if (data.durum === 'MOTOR ÇALIŞMIYOR') {
             // Diğer değerler 0
-            params.append('aydemVoltaji', '0');
-            params.append('aktifGuc', '0');
-            params.append('reaktifGuc', '0');
-            params.append('cosPhi', '0');
-            params.append('ortAkim', '0');
-            params.append('ortGerilim', '0');
-            params.append('notrAkim', '0');
-            params.append('tahrikGerilimi', '0');
+            params.append('aydemVoltaji', '0.00');
+            params.append('aktifGuc', '0.00');
+            params.append('reaktifGuc', '0.00');
+            params.append('cosPhi', '0.00');
+            params.append('ortAkim', '0.00');
+            params.append('ortGerilim', '0.00');
+            params.append('notrAkim', '0.00');
+            params.append('tahrikGerilimi', '0.00');
             // Son değerler (kaydedilen)
             params.append('toplamAktifEnerji', data.toplamAktifEnerji || '0');
             params.append('calismaSaati', data.calismaSaati || '0');

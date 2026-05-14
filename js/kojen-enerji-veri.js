@@ -549,7 +549,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const inputs = document.querySelectorAll('.kojen-input');
         if (existingRecord.durum === 'MOTOR ÇALIŞMIYOR') {
             inputs.forEach(input => {
-                input.value = '0';
+                input.value = '0.00';
                 input.style.background = '#ffebee';
                 input.style.color = '#c62828';
             });
@@ -746,7 +746,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 lockForm(false);
                 const inputs = document.querySelectorAll('.kojen-input');
                 if (record.durum === 'MOTOR ÇALIŞMIYOR') {
-                    inputs.forEach(input => { input.value = '0'; input.style.background = '#ffebee'; input.style.color = '#c62828'; });
+                    inputs.forEach(input => { input.value = '0.00'; input.style.background = '#ffebee'; input.style.color = '#c62828'; });
                 } else {
                     inputs[0].value = (record.aydemVoltaji || '').replace(',', '.');
                     inputs[1].value = (record.aktifGuc || '').replace(',', '.');
@@ -864,7 +864,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 input.value = kalkisSayisi;
                 console.log('✅ KALKIŞ SAYISI yazıldı:', kalkisSayisi);
             } else {
-                input.value = '0'; // Diğerleri 0
+                input.value = '0.00'; // Diğerleri 0
             }
         });
         
@@ -883,14 +883,14 @@ document.addEventListener('DOMContentLoaded', async function() {
                 calismaSaati: calismaSaati,
                 kalkisSayisi: kalkisSayisi,
                 // Diğer değerler 0
-                aydemVoltaji: '0',
-                aktifGuc: '0',
-                reaktifGuc: '0',
-                cosPhi: '0',
-                ortAkim: '0',
-                ortGerilim: '0',
-                notrAkim: '0',
-                tahrikGerilimi: '0'
+                aydemVoltaji: '0.00',
+                aktifGuc: '0.00',
+                reaktifGuc: '0.00',
+                cosPhi: '0.00',
+                ortAkim: '0.00',
+                ortGerilim: '0.00',
+                notrAkim: '0.00',
+                tahrikGerilimi: '0.00'
             });
             
             if (result.success) {
@@ -1360,13 +1360,14 @@ async function handleModalKaydet() {
                             };
                             
                             // Motor çalışmıyor durumunda diğer değerleri 0 olarak ayarla
-                            kayitVerisi.aydemVoltaji = '0';
-                            kayitVerisi.aktifGuc = '0';
-                            kayitVerisi.reaktifGuc = '0';
-                            kayitVerisi.cosPhi = '0';
-                            kayitVerisi.ortGerilim = '0';
-                            kayitVerisi.notrAkim = '0';
-                            kayitVerisi.tahrikGerilimi = '0';
+                            kayitVerisi.aydemVoltaji = '0.00';
+                            kayitVerisi.aktifGuc = '0.00';
+                            kayitVerisi.reaktifGuc = '0.00';
+                            kayitVerisi.cosPhi = '0.00';
+                            kayitVerisi.ortAkim = '0.00';
+                            kayitVerisi.ortGerilim = '0.00';
+                            kayitVerisi.notrAkim = '0.00';
+                            kayitVerisi.tahrikGerilimi = '0.00';
                             
                             const result = await saveEnerjiToSheets(kayitVerisi);
                             if (result.success) {
@@ -1584,14 +1585,14 @@ async function handleModalKaydet() {
             tarih: modalTarih,
             vardiya: modalVardiya,
             saat: saat,
-            aydemVoltaji: '0,00',
-            aktifGuc: '0,00',
-            reaktifGuc: '0,00',
-            cosPhi: '0,00',
-            ortAkim: '0,00',
-            ortGerilim: '0,00',
-            notrAkim: '0,00',
-            tahrikGerilimi: '0,00',
+            aydemVoltaji: '0.00',
+            aktifGuc: '0.00',
+            reaktifGuc: '0.00',
+            cosPhi: '0.00',
+            ortAkim: '0.00',
+            ortGerilim: '0.00',
+            notrAkim: '0.00',
+            tahrikGerilimi: '0.00',
             toplamAktifEnerji: sonKayit.toplamAktifEnerji || '0,00',
             calismaSaati: sonKayit.calismaSaati || '0,00',
             kalkisSayisi: sonKayit.kalkisSayisi || '0,00',
