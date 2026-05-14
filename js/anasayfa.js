@@ -61,19 +61,25 @@ document.addEventListener('DOMContentLoaded', function() {
             priority: 'normal'
         }
     ];
+    let dashboardAnnouncements = null;
 
     // Sayfa yüklendiğinde verileri göster
     setTimeout(loadDashboardData, 1000);
     setInterval(loadDashboardData, 5 * 60 * 1000);
 
     async function loadDashboardData() {
-        updateAnnouncementTicker();
-        await loadDailyProductionData();
-        await loadLatestEnergyData();
-        await loadLatestMotorStatus();
+        const dashboardLoaded = await loadDashboardSummary();
+        if (!dashboardLoaded) {
+            await updateAnnouncementTicker();
+            await loadDailyProductionData();
+            await loadLatestEnergyData();
+            await loadLatestMotorStatus();
+            await loadBuharData();
+            await loadMaintenanceData();
+        } else {
+            await updateAnnouncementTicker();
+        }
         updateMotorData();
-        await loadBuharData(); // Buhar verisini çek
-        await loadMaintenanceData();
         updateSummaryData();
         animateProgressBars();
     }
@@ -113,7 +119,62 @@ document.addEventListener('DOMContentLoaded', function() {
         return category ? `${category}: ${text}` : text;
     }
 
+    async function loadDashboardSummary() {
+        try {
+            const url = new URL(KOJEN_ENERJI_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'getDashboardSummary');
+
+            const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+            const result = await response.json();
+
+            if (!result.success) {
+                console.error('Dashboard ozeti alinamadi:', result.error);
+                return false;
+            }
+
+            if (result.summary) {
+                summaryData.dailyProduction = parseDashboardNumber(result.summary.dailyProduction);
+                summaryData.dailySteam = result.summary.dailySteam === null || result.summary.dailySteam === undefined
+                    ? null
+                    : parseDashboardNumber(result.summary.dailySteam);
+                summaryData.pendingMaintenance = parseDashboardNumber(result.summary.pendingMaintenance);
+                summaryData.activeFaults = parseDashboardNumber(result.summary.activeFaults);
+            }
+
+            if (result.motors) {
+                Object.entries(result.motors).forEach(([key, data]) => {
+                    if (!motorData[key]) return;
+                    motorData[key].totalProduction = parseDashboardNumber(data.totalProduction);
+                    motorData[key].dailyHours = parseDashboardNumber(data.dailyHours);
+                    motorData[key].totalHours = parseDashboardNumber(data.totalHours);
+                    motorData[key].dailyProduction = Math.round(parseDashboardNumber(data.dailyProduction));
+                    motorData[key].avgProduction = parseDashboardNumber(data.avgProduction);
+                    motorData[key].progress = Math.min(parseDashboardNumber(data.progress), 100);
+                    motorData[key].status = data.status === 'running' ? 'running' : 'stopped';
+                });
+            }
+
+            if (Array.isArray(result.announcements)) {
+                dashboardAnnouncements = result.announcements;
+                localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(result.announcements));
+            }
+
+            if (Array.isArray(result.errors) && result.errors.length) {
+                console.warn('Dashboard kismi hatalar:', result.errors);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Dashboard ozeti yuklenemedi:', error);
+            return false;
+        }
+    }
+
     async function getTodayAnnouncements() {
+        if (Array.isArray(dashboardAnnouncements)) {
+            return filterTodayAnnouncements(dashboardAnnouncements);
+        }
+
         if (window.fetchAnnouncementsFromSheets && window.isBildirimSheetsEnabled?.()) {
             try {
                 const result = await fetchAnnouncementsFromSheets({ active: 'true' });

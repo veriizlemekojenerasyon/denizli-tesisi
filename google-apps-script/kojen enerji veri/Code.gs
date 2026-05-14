@@ -62,6 +62,9 @@ function handleRequest(e) {
       case 'getDailyProductionSummary':
         result = getDailyProductionSummary(params.tarih, params.updateSheet === 'true');
         break;
+      case 'getDashboardSummary':
+        result = getDashboardSummary(params.tarih);
+        break;
       case 'updateDailyProductionSheet':
         result = updateDailyProductionSheet(params.tarih);
         break;
@@ -639,6 +642,216 @@ function updateDailyProductionSheet(tarih) {
   var sheetResult = updateDailyProductionSheetFromSummary(summary);
   summary.sheet = sheetResult;
   return summary;
+}
+
+function getDashboardSummary(tarih) {
+  var startedAt = new Date();
+  var targetTarih = normalizeDateTR(tarih || Utilities.formatDate(startedAt, Session.getScriptTimeZone(), 'dd.MM.yyyy'));
+  var motorData = createEmptyDashboardMotors();
+  var summary = {
+    dailyProduction: 0,
+    dailySteam: null,
+    pendingMaintenance: 0,
+    activeFaults: 0
+  };
+  var errors = [];
+
+  try {
+    var daily = getDailyProductionSummary(targetTarih, false);
+    if (daily.success) {
+      summary.dailyProduction = daily.totalDailyProductionMwh || 0;
+      if (daily.data && daily.data.length) {
+        for (var i = 0; i < daily.data.length; i++) {
+          var item = daily.data[i];
+          var key = getDashboardMotorKey(item.motor);
+          if (!motorData[key]) continue;
+
+          var dailyKwh = parseEnerjiNumber(item.dailyProductionKwh);
+          var dailyHours = parseEnerjiNumber(item.dailyHours);
+          var lastEnergy = parseEnerjiNumber(item.lastEnergy);
+          var lastWorkingHour = parseEnerjiNumber(item.lastWorkingHour);
+
+          motorData[key].dailyProduction = Math.round(dailyKwh);
+          motorData[key].dailyHours = dailyHours;
+          if (lastEnergy > 0) motorData[key].totalProduction = lastEnergy / 1000;
+          if (lastWorkingHour > 0) motorData[key].totalHours = lastWorkingHour;
+          motorData[key].avgProduction = dailyHours > 0 ? dailyKwh / dailyHours : 0;
+          motorData[key].progress = Math.min((dailyHours / 24) * 100, 100);
+          if (dailyKwh > 0 || dailyHours > 0) motorData[key].status = 'running';
+        }
+      }
+    } else {
+      errors.push('dailyProduction: ' + daily.error);
+    }
+
+    var latestEnergy = getLastRecords(100);
+    if (latestEnergy.success && latestEnergy.data) {
+      applyLatestEnergyToDashboard(motorData, latestEnergy.data);
+    } else if (!latestEnergy.success) {
+      errors.push('latestEnergy: ' + latestEnergy.error);
+    }
+
+    var external = fetchDashboardExternalData();
+    applyDashboardMotorStatus(motorData, external.motorRecords);
+    summary.dailySteam = getDashboardSteamValue(external.buharRecords);
+    var maintenanceSummary = getDashboardMaintenanceSummary(external.maintenanceRecords);
+    summary.pendingMaintenance = maintenanceSummary.pendingMaintenance;
+    summary.activeFaults = maintenanceSummary.activeFaults;
+
+    if (external.errors.length) {
+      errors = errors.concat(external.errors);
+    }
+
+    return {
+      success: true,
+      tarih: targetTarih,
+      summary: summary,
+      motors: motorData,
+      announcements: external.announcements,
+      errors: errors,
+      durationMs: new Date().getTime() - startedAt.getTime()
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.toString(),
+      durationMs: new Date().getTime() - startedAt.getTime()
+    };
+  }
+}
+
+function createEmptyDashboardMotors() {
+  return {
+    gm1: { totalProduction: 0, dailyHours: 0, totalHours: 0, dailyProduction: 0, avgProduction: 0, progress: 0, status: 'stopped' },
+    gm2: { totalProduction: 0, dailyHours: 0, totalHours: 0, dailyProduction: 0, avgProduction: 0, progress: 0, status: 'stopped' },
+    gm3: { totalProduction: 0, dailyHours: 0, totalHours: 0, dailyProduction: 0, avgProduction: 0, progress: 0, status: 'stopped' }
+  };
+}
+
+function getDashboardMotorKey(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeDashboardText(value) {
+  return String(value || '').toLowerCase()
+    .replace(/\u0131/g, 'i')
+    .replace(/\u011F/g, 'g')
+    .replace(/\u00FC/g, 'u')
+    .replace(/\u015F/g, 's')
+    .replace(/\u00F6/g, 'o')
+    .replace(/\u00E7/g, 'c');
+}
+
+function isDashboardStoppedStatus(value) {
+  var status = normalizeDashboardText(value);
+  return status.indexOf('calismiyor') !== -1 ||
+    status.indexOf('durdu') !== -1 ||
+    status.indexOf('stop') !== -1;
+}
+
+function isDashboardFaultType(value) {
+  return normalizeDashboardText(value) === 'ariza';
+}
+
+function applyLatestEnergyToDashboard(motorData, records) {
+  var seen = {};
+  for (var i = 0; i < records.length; i++) {
+    var record = records[i];
+    var key = getDashboardMotorKey(record.motor);
+    if (!motorData[key] || seen[key]) continue;
+    seen[key] = true;
+
+    motorData[key].totalProduction = parseEnerjiNumber(record.toplamAktifEnerji) / 1000;
+    motorData[key].totalHours = parseEnerjiNumber(record.calismaSaati);
+    if (isDashboardStoppedStatus(record.durum)) {
+      motorData[key].status = 'stopped';
+    }
+  }
+}
+
+function applyDashboardMotorStatus(motorData, records) {
+  var seen = {};
+  for (var i = 0; i < records.length; i++) {
+    var record = records[i];
+    var key = getDashboardMotorKey(record.motor);
+    if (!motorData[key] || seen[key]) continue;
+    seen[key] = true;
+    motorData[key].status = isDashboardStoppedStatus(record.durum) ? 'stopped' : 'running';
+  }
+}
+
+function getDashboardSteamValue(records) {
+  if (!records || !records.length) return null;
+  var record = records[0];
+  return parseEnerjiNumber(record.buharMiktari);
+}
+
+function getDashboardMaintenanceSummary(records) {
+  var result = { pendingMaintenance: 0, activeFaults: 0 };
+  for (var i = 0; i < records.length; i++) {
+    var record = records[i];
+    if (normalizeDashboardText(record.status) !== 'aktif') continue;
+    if (isDashboardFaultType(record.type)) {
+      result.activeFaults++;
+    } else {
+      result.pendingMaintenance++;
+    }
+  }
+  return result;
+}
+
+function fetchDashboardExternalData() {
+  var urls = {
+    motor: 'https://script.google.com/macros/s/AKfycbz33FlBicqkZdRw5UOdagkiZK3leF18QuVPETLK_HGysSYbDAxigev0o_UUnYxuHAr-JA/exec?action=getLastRecords&count=100',
+    buhar: 'https://script.google.com/macros/s/AKfycbxnhHSmc5GTuOq8hdqgFM2-FA2XNjRdLHoED5gmjXbmWcYycPNXykdd0ZYTzOI3HNJxKg/exec?action=getLastRecords&count=1',
+    maintenance: 'https://script.google.com/macros/s/AKfycbyimCmn6QQy0hl__KEqcLl_xd0rLjW9S-tS7vWU-nqwepH2Ur4tCDbzMvBafuSLrhQkEw/exec?action=getActiveRecords',
+    announcements: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec?action=getAnnouncements&active=true'
+  };
+
+  var keys = ['motor', 'buhar', 'maintenance', 'announcements'];
+  var requests = keys.map(function(key) {
+    return {
+      url: urls[key],
+      method: 'get',
+      muteHttpExceptions: true
+    };
+  });
+
+  var output = {
+    motorRecords: [],
+    buharRecords: [],
+    maintenanceRecords: [],
+    announcements: [],
+    errors: []
+  };
+
+  try {
+    var responses = UrlFetchApp.fetchAll(requests);
+    for (var i = 0; i < responses.length; i++) {
+      var key = keys[i];
+      var response = responses[i];
+      var code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        output.errors.push(key + ': HTTP ' + code);
+        continue;
+      }
+
+      var payload = JSON.parse(response.getContentText());
+      if (!payload.success) {
+        output.errors.push(key + ': ' + (payload.error || payload.message || 'Basarisiz'));
+        continue;
+      }
+
+      if (key === 'motor') output.motorRecords = payload.data || [];
+      if (key === 'buhar') output.buharRecords = payload.data || [];
+      if (key === 'maintenance') output.maintenanceRecords = payload.records || [];
+      if (key === 'announcements') output.announcements = payload.data || [];
+    }
+  } catch (error) {
+    output.errors.push('externalFetch: ' + error.toString());
+  }
+
+  return output;
 }
 
 function updateDailyProductionSheetFromSummary(summary) {
