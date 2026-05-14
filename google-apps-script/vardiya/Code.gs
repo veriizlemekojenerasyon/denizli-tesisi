@@ -202,16 +202,20 @@ function endVardiya(data) {
     }
     
     // Tarih ve vardiyaya göre aktif kaydı bul
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getDisplayValues();
     var dates = sheet.getRange(2, 2, lastRow - 1, 1).getDisplayValues();
     var vardiyas = sheet.getRange(2, 3, lastRow - 1, 1).getDisplayValues();
     var statuses = sheet.getRange(2, 9, lastRow - 1, 1).getDisplayValues();
+    var targetId = data.id || '';
     var targetTarih = formatDateTR(data.tarih);
     var targetVardiya = data.vardiya;
     var foundRow = -1;
     var recordID = '';
     
     for (var i = 0; i < dates.length; i++) {
-      if (dates[i][0] === targetTarih && vardiyas[i][0] === targetVardiya && statuses[i][0] === 'Aktif') {
+      var idMatches = targetId && ids[i][0] === targetId;
+      var dateShiftMatches = dates[i][0] === targetTarih && vardiyas[i][0] === targetVardiya;
+      if ((idMatches || dateShiftMatches) && isActiveStatus(statuses[i][0])) {
         foundRow = i + 2;
         break;
       }
@@ -357,7 +361,12 @@ function getRecordByDateVardiya(tarih, vardiya) {
     if (!result.success) return result;
     
     var formattedTarih = formatDateTR(tarih);
-    var record = result.data.find(r => r.tarih === formattedTarih && r.vardiya === vardiya);
+    var records = result.data.filter(function(record) {
+      return record.tarih === formattedTarih && record.vardiya === vardiya;
+    });
+    var record = records.find(function(item) {
+      return isActiveStatus(item.durum);
+    }) || records[0];
     
     if (record) {
       return { success: true, data: record, found: true };
@@ -381,6 +390,10 @@ function formatDateTR(dateString) {
 }
 
 // Saat formatı (HH:mm:ss)
+function isActiveStatus(value) {
+  return String(value || '').trim().toLowerCase() === 'aktif';
+}
+
 function formatTimeTR(date) {
   if (!date) return '';
   var d = new Date(date);

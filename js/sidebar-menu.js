@@ -1,8 +1,8 @@
-// Tüm sayfalardaki sidebar menülerini düzeltmek için kullanılacak standart menü yapısı
-// Her sayfa için aktif menüyü belirlemek üzere kullanılır
+// Standart sidebar menu yapisi.
+// Her sayfa aktif menuyu belirlemek icin generateMenuHTML(activePage) kullanabilir.
 
 const standardMenu = [
-    { id: 'anasayfa', icon: '🏠', text: 'Ana Sayfa', href: 'index.html' },
+    { id: 'anasayfa', icon: '🏠', text: 'Ana Sayfa', href: 'anasayfa.html' },
     { id: 'saatlik', icon: '📊', text: 'Saatlik Veri Girişi', href: 'saatlik-veri-giris.html' },
     { id: 'gunluk', icon: '📆', text: 'Günlük Veri Girişi', href: 'gunluk-veri-giris.html' },
     { id: 'buhar', icon: '💨', text: 'Buhar Verisi', href: 'buhar-verisi.html' },
@@ -11,6 +11,8 @@ const standardMenu = [
     { id: 'kojen-motor', icon: '⚙️', text: 'Kojen Motor Veri', href: 'kojen-motor-veri.html' },
     { id: 'kojen-enerji', icon: '⚡', text: 'Kojen Enerji Veri', href: 'kojen-enerji-veri.html' },
     { id: 'bakim', icon: '🔧', text: 'Bakım Takibi', href: 'bakim-takibi.html' },
+    { id: 'stok', icon: '📦', text: 'Stok Takip', href: 'stok-takip.html' },
+    { id: 'bildirim', icon: '📢', text: 'Bildirim Yönetimi', href: 'admin-bildirim.html' },
     { id: 'kullanici', icon: '👤', text: 'Kullanıcı Yönetimi', href: 'kullanici-yonetimi.html' }
 ];
 

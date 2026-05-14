@@ -45,6 +45,12 @@ function handleRequest(e) {
       case 'sendEmail':
         result = sendEmailAlert(e.parameter);
         break;
+      case 'checkHourlyMissingRecords':
+        result = checkHourlyMissingRecords();
+        break;
+      case 'installHourlyMissingRecordTrigger':
+        result = installHourlyMissingRecordTrigger();
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -142,7 +148,7 @@ function addRecord(data) {
     var kayitTarihi = formatDateTimeTR(new Date());
     var formattedTarih = formatDateTR(data.tarih);
     
-    sheet.appendRow([
+    var rowData = [
       nextID.toString(),
       formattedTarih,
       data.saat,
@@ -155,10 +161,13 @@ function addRecord(data) {
       data.kaydeden || '',
       data.notlar || '',
       kayitTarihi
-    ]);
+    ];
+    var insertRow = findInsertPosition(sheet, formattedTarih, data.saat);
+    sheet.insertRowBefore(insertRow);
+    sheet.getRange(insertRow, 1, 1, 11).setValues([rowData]);
     
     // Yeni satır formatı
-    var newRow = sheet.getLastRow();
+    var newRow = insertRow;
     sheet.getRange(newRow, 1, 1, 11).setHorizontalAlignment('center');
     sheet.getRange(newRow, 1, 1, 11).setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
     
@@ -305,6 +314,120 @@ function getRecordByDateTime(tarih, saat) {
 }
 
 // Tarih formatı (dd.MM.yyyy)
+function checkHourlyMissingRecords() {
+  try {
+    var now = new Date();
+    if (now.getMinutes() < 55) {
+      return { success: true, skipped: true, message: 'Kontrol dakikasi degil' };
+    }
+
+    var tarih = formatDateTR(Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd'));
+    var saat = String(now.getHours()).padStart(2, '0') + ':00';
+    var sentKey = 'saatlikHourlyCheck:' + tarih + ':' + saat;
+    var props = PropertiesService.getScriptProperties();
+
+    if (props.getProperty(sentKey)) {
+      return { success: true, skipped: true, message: 'Bu saat daha once kontrol edildi' };
+    }
+
+    var existing = getRecordByDateTime(tarih, saat);
+    if (existing.success && existing.found) {
+      props.setProperty(sentKey, new Date().toISOString());
+      return { success: true, missing: false, added: false, message: 'Kayit mevcut' };
+    }
+
+    var vardiya = getVardiyaByHour(now.getHours());
+    var addResult = addRecord({
+      tarih: tarih,
+      saat: saat,
+      vardiya: vardiya,
+      aktifMwh: '0',
+      reaktifMwh: '0',
+      aydemAktif: '0',
+      aydemReaktif: '0',
+      kaydeden: 'OTOMATIK SISTEM',
+      notlar: 'KAYIT GIRILMEDI - OTOMATIK'
+    });
+
+    var subject = 'Saatlik Veri Girisi Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
+    var body = 'Saatlik Veri Girisi Uyarisi\n\n' +
+      'Tarih: ' + tarih + '\n' +
+      'Saat: ' + saat + '\n' +
+      'Vardiya: ' + vardiya + '\n\n' +
+      'Bu saat icin saatlik veri girilmedi. Sistem otomatik bos kayit olusturdu.\n\n' +
+      'Otomatik kayit sonucu: ' + (addResult.success ? 'Basarili' : addResult.error);
+
+    var mailResult = sendEmailAlert({ subject: subject, body: body });
+    props.setProperty(sentKey, new Date().toISOString());
+
+    return {
+      success: true,
+      missing: true,
+      added: addResult.success,
+      addResult: addResult,
+      mail: mailResult
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function installHourlyMissingRecordTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('checkHourlyMissingRecords')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  return { success: true, message: 'Saatlik eksik kayit tetikleyicisi kuruldu' };
+}
+
+function getVardiyaByHour(hour) {
+  if (hour >= 8 && hour < 16) return '08-16';
+  if (hour >= 16 && hour < 24) return '16-24';
+  return '24-08';
+}
+
+function findInsertPosition(sheet, tarih, saat) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return 2;
+  }
+
+  var targetTime = parseDateTimeTR(tarih, saat).getTime();
+  var data = sheet.getRange(2, 2, lastRow - 1, 2).getDisplayValues();
+
+  for (var i = 0; i < data.length; i++) {
+    var rowTime = parseDateTimeTR(data[i][0], data[i][1]).getTime();
+    if (rowTime > targetTime) {
+      return i + 2;
+    }
+  }
+
+  return lastRow + 1;
+}
+
+function parseDateTimeTR(tarih, saat) {
+  var parts = String(tarih || '').indexOf('-') !== -1
+    ? String(tarih || '').split('-').reverse()
+    : String(tarih || '').split('.');
+  var hourParts = String(saat || '00:00').split(':');
+
+  return new Date(
+    parseInt(parts[2], 10),
+    parseInt(parts[1], 10) - 1,
+    parseInt(parts[0], 10),
+    parseInt(hourParts[0] || '0', 10),
+    parseInt(hourParts[1] || '0', 10)
+  );
+}
+
 function formatDateTR(dateString) {
   if (!dateString) return '';
   var parts = dateString.split('-');

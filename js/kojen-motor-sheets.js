@@ -4,7 +4,7 @@
  */
 
 const KojenMotorSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxqjnnIjj6hWMuKYa_ioBPx6hS8STMtDHeVj5__TaG632-V6Cel5BxNGWDkZ_wMmI16fw/exec',
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwqMpjWZtjczxkbS2TwOSGIkE2SS2P27t1oDRxpZpAXRl6FwSXkGGhlrj2Ccj4wDl-IXw/exec',
     EMAIL_ENABLED: true,
     EMAIL_TO: 'mrtcsk0320@gmail.com',
     EMAIL_SUBJECT: 'Kojen Motor Veri Uyarısı - Kayıt Girilmedi'

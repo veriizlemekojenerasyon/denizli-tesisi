@@ -58,6 +58,12 @@ function handleRequest(e) {
       case 'sendEmail':
         result = sendEmailAlert(e.parameter);
         break;
+      case 'checkHourlyMissingRecords':
+        result = checkHourlyMissingRecords();
+        break;
+      case 'installHourlyMissingRecordTrigger':
+        result = installHourlyMissingRecordTrigger();
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -230,7 +236,7 @@ function addRecord(data) {
     }
     
     // 🔥 SAAT SIRALAMASI İÇİN DOĞRU KONUMU BUL
-    var insertRow = findInsertPosition(sheet, formattedTarih, data.saat);
+    var insertRow = findInsertPositionByDateTime(sheet, formattedTarih, data.saat);
     
     // Kaydı doğru konuma ekle
     sheet.insertRowBefore(insertRow);
@@ -559,6 +565,25 @@ function findInsertPosition(sheet, tarih, saat) {
 }
 
 // Çoklu kayıt ekleme
+function findInsertPositionByDateTime(sheet, tarih, saat) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return 2;
+  }
+
+  var targetTime = parseDateTimeTR(tarih, saat).getTime();
+  var data = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+
+  for (var i = 0; i < data.length; i++) {
+    var rowTime = parseDateTimeTR(data[i][0], data[i][2]).getTime();
+    if (rowTime > targetTime) {
+      return i + 2;
+    }
+  }
+
+  return lastRow + 1;
+}
+
 function parseEnerjiNumber(value) {
   if (value === null || value === undefined || value === '') {
     return 0;
@@ -634,10 +659,21 @@ function addMultipleRecords(dataString) {
         rowData[13] = parseEnerjiNumber(record.calismaSaati);
         rowData[14] = parseEnerjiNumber(record.kalkisSayisi);
         rowData[15] = record.durum || 'MOTOR ÇALIŞMIYOR';
+        if (rowData[15] !== 'NORMAL') {
+          rowData[4] = 0;
+          rowData[5] = 0;
+          rowData[6] = 0;
+          rowData[7] = 0;
+          rowData[8] = 0;
+          rowData[9] = 0;
+          rowData[10] = 0;
+          rowData[11] = 0;
+        }
         
         // Satırı ekle
-        sheet.appendRow(rowData);
-        var newRow = sheet.getLastRow();
+        var newRow = findInsertPositionByDateTime(sheet, tarih, record.saat);
+        sheet.insertRowBefore(newRow);
+        sheet.getRange(newRow, 1, 1, 18).setValues([rowData]);
         var dataRange = sheet.getRange(newRow, 1, 1, 18);
         dataRange.setHorizontalAlignment('center');
         dataRange.setFontSize(10);
@@ -696,6 +732,145 @@ function addMultipleRecords(dataString) {
 }
 
 // 🔥 Tarihleri renklendirme fonksiyonu
+function checkHourlyMissingRecords() {
+  try {
+    var now = new Date();
+    var minute = now.getMinutes();
+    if (minute < 55) {
+      return { success: true, skipped: true, message: 'Kontrol dakikasi degil' };
+    }
+
+    var hour = now.getHours();
+    var saat = pad2(hour) + ':00';
+    var tarih = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+    var vardiya = getVardiyaByHour(hour);
+    var sentKey = 'kojenEnerjiHourlyCheck:' + tarih + ':' + saat;
+    var props = PropertiesService.getScriptProperties();
+
+    if (props.getProperty(sentKey)) {
+      return { success: true, skipped: true, message: 'Bu saat daha once kontrol edildi' };
+    }
+
+    var motors = ['GM-1', 'GM-2', 'GM-3'];
+    var missing = [];
+    for (var i = 0; i < motors.length; i++) {
+      var exists = checkExistingRecord(motors[i], tarih, saat);
+      if (!exists.success || !exists.exists) {
+        missing.push(motors[i]);
+      }
+    }
+
+    if (missing.length === 0) {
+      props.setProperty(sentKey, new Date().toISOString());
+      return { success: true, missingCount: 0, addedCount: 0, message: 'Eksik enerji kaydi yok' };
+    }
+
+    var added = [];
+    var errors = [];
+    for (var j = 0; j < missing.length; j++) {
+      var motor = missing[j];
+      var lastNormal = getLastNormalRecordBefore(motor, tarih, saat);
+      var autoData = {
+        tarih: tarih,
+        vardiya: vardiya,
+        saat: saat,
+        motor: motor,
+        kaydeden: 'OTOMATIK SISTEM',
+        durum: 'MOTOR ÇALIŞMIYOR',
+        toplamAktifEnerji: lastNormal ? lastNormal.toplamAktifEnerji : '0',
+        calismaSaati: lastNormal ? lastNormal.calismaSaati : '0',
+        kalkisSayisi: lastNormal ? lastNormal.kalkisSayisi : '0'
+      };
+      var addResult = addRecord(autoData);
+      if (addResult.success) {
+        added.push(motor);
+      } else {
+        errors.push(motor + ': ' + addResult.error);
+      }
+    }
+
+    var subject = 'Kojen Enerji Veri Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
+    var body = 'Kojen Enerji Veri Uyarisi\n\n' +
+      'Tarih: ' + tarih + '\n' +
+      'Saat: ' + saat + '\n' +
+      'Vardiya: ' + vardiya + '\n\n' +
+      'Eksik motor enerji kayitlari: ' + missing.join(', ') + '\n' +
+      'Otomatik bos kayit eklenenler: ' + (added.length ? added.join(', ') : '-') + '\n' +
+      (errors.length ? 'Kayit hatalari: ' + errors.join('; ') + '\n' : '') +
+      '\nBu saat icin veri girilmedigi icin sistem otomatik bos kayit olusturdu.';
+
+    var mailResult = sendEmailAlert({ subject: subject, body: body });
+    props.setProperty(sentKey, new Date().toISOString());
+
+    return {
+      success: true,
+      missingCount: missing.length,
+      addedCount: added.length,
+      errors: errors,
+      mail: mailResult
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function installHourlyMissingRecordTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('checkHourlyMissingRecords')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  return { success: true, message: 'Enerji saatlik eksik kayit tetikleyicisi kuruldu' };
+}
+
+function getVardiyaByHour(hour) {
+  if (hour >= 8 && hour < 16) return '08-16';
+  if (hour >= 16 && hour < 24) return '16-24';
+  return '24-08';
+}
+
+function getLastNormalRecordBefore(motor, tarih, saat) {
+  var result = getRecords();
+  if (!result.success || !result.data) return null;
+
+  var limit = parseDateTimeTR(tarih, saat);
+  var records = result.data.filter(function(record) {
+    return String(record.motor || '').trim() === motor &&
+      String(record.durum || '').toUpperCase() === 'NORMAL' &&
+      parseDateTimeTR(record.tarih, record.saat) < limit;
+  });
+
+  records.sort(function(a, b) {
+    return parseDateTimeTR(b.tarih, b.saat) - parseDateTimeTR(a.tarih, a.saat);
+  });
+
+  return records[0] || null;
+}
+
+function parseDateTimeTR(tarih, saat) {
+  var text = String(tarih || '');
+  var parts = text.indexOf('-') !== -1 ? text.split('-').reverse() : text.split('.');
+  var hourParts = String(saat || '00:00').split(':');
+  return new Date(
+    parseInt(parts[2], 10),
+    parseInt(parts[1], 10) - 1,
+    parseInt(parts[0], 10),
+    parseInt(hourParts[0] || '0', 10),
+    parseInt(hourParts[1] || '0', 10)
+  );
+}
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
 function colorizeDates(sheet, addedRecords) {
   try {
     // Tarihleri grupla

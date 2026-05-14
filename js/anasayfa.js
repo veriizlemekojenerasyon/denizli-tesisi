@@ -43,9 +43,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Buhar verisi config
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnhHSmc5GTuOq8hdqgFM2-FA2XNjRdLHoED5gmjXbmWcYycPNXykdd0ZYTzOI3HNJxKg/exec';
+    const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
+    const defaultAnnouncements = [
+        {
+            title: '08-16 vardiyasi: kojenerasyon saha kontrol listesi tamamlanacak',
+            priority: 'high'
+        },
+        {
+            title: 'GM motor yag ve sogutma degerleri saatlik kayitlarda dikkatle kontrol edilecek',
+            priority: 'medium'
+        },
+        {
+            title: 'Vardiya tesliminde yapilan isler ve bekleyen konular vardiya notuna yazilacak',
+            priority: 'normal'
+        }
+    ];
 
     // Sayfa yüklendiğinde verileri göster
     setTimeout(async () => {
+        updateAnnouncementTicker();
         updateMotorData();
         await loadBuharData(); // Buhar verisini çek
         updateSummaryData();
@@ -53,6 +69,153 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 
     // Motor verilerini güncelle
+    async function updateAnnouncementTicker() {
+        const tickerTrack = document.getElementById('announcementTickerTrack');
+        if (!tickerTrack) return;
+
+        const announcements = await getTodayAnnouncements();
+        tickerTrack.innerHTML = '';
+
+        if (announcements.length === 0) {
+            tickerTrack.appendChild(createTickerItem('Bugun icin aktif vardiya duyurusu bulunmuyor.', 'normal'));
+            tickerTrack.style.animation = 'none';
+            return;
+        }
+
+        const tickerItems = [...announcements, ...announcements];
+        tickerItems.forEach(item => {
+            tickerTrack.appendChild(createTickerItem(formatTickerText(item), item.priority, item.category));
+        });
+
+        tickerTrack.style.animation = announcements.length === 1 ? 'tickerScroll 24s linear infinite' : '';
+    }
+
+    function createTickerItem(text, priority = 'normal', category = 'general') {
+        const item = document.createElement('span');
+        item.className = `ticker-item ${priority || 'normal'} category-${category || 'general'}`;
+        item.textContent = text;
+        return item;
+    }
+
+    function formatTickerText(item) {
+        const category = formatAnnouncementCategory(item.category);
+        const text = item.title || item.message || 'Duyuru metni yok';
+        return category ? `${category}: ${text}` : text;
+    }
+
+    async function getTodayAnnouncements() {
+        if (window.fetchAnnouncementsFromSheets && window.isBildirimSheetsEnabled?.()) {
+            try {
+                const result = await fetchAnnouncementsFromSheets({ active: 'true' });
+                if (result.success && Array.isArray(result.data)) {
+                    localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(result.data));
+                    return filterTodayAnnouncements(result.data);
+                }
+            } catch (error) {
+                console.error('Sheets duyurulari okunamadi:', error);
+            }
+        }
+
+        try {
+            const stored = JSON.parse(localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY) || '[]');
+            if (!Array.isArray(stored) || stored.length === 0) return defaultAnnouncements;
+            return filterTodayAnnouncements(stored);
+        } catch (error) {
+            console.error('Vardiya duyurulari okunamadi:', error);
+            return defaultAnnouncements;
+        }
+    }
+
+    function filterTodayAnnouncements(items) {
+        const today = new Date().toISOString().split('T')[0];
+        const user = getLoggedInUser();
+        const activeItems = items.filter(item => {
+            const isActive = item.active !== false;
+            return isActive && matchesDateRange(item, today) && matchesTarget(item, user);
+        });
+
+        return activeItems.length > 0 ? activeItems : defaultAnnouncements;
+    }
+
+    function matchesDateRange(item, today) {
+        const start = toIsoDate(item.startDate || item.date || '');
+        const end = toIsoDate(item.endDate || '');
+        if (start && today < start) return false;
+        if (end && today > end) return false;
+        return true;
+    }
+
+    function matchesTarget(item, user) {
+        const target = item.target || 'all';
+        if (target === 'all') return true;
+        return user?.role === target;
+    }
+
+    function toIsoDate(value) {
+        if (!value) return '';
+        const text = String(value);
+        if (text.includes('-')) return text;
+        const parts = text.split('.');
+        return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : '';
+    }
+
+    function getLoggedInUser() {
+        try {
+            return JSON.parse(localStorage.getItem('loggedInUser') || 'null');
+        } catch (error) {
+            return null;
+        }
+    }
+
+    const announcementDetailsBtn = document.getElementById('announcementDetailsBtn');
+    if (announcementDetailsBtn) {
+        announcementDetailsBtn.addEventListener('click', async function() {
+            const announcements = await getTodayAnnouncements();
+            await markVisibleAnnouncementsRead(announcements);
+            const message = announcements.map((item, index) => {
+                const attachment = item.attachmentUrl ? `\n   Ek: ${item.attachmentUrl}` : '';
+                return `${index + 1}. ${formatTickerText(item)}${attachment}`;
+            }).join('\n');
+            alert(message || 'Bugun icin aktif vardiya duyurusu bulunmuyor.');
+        });
+    }
+
+    async function markVisibleAnnouncementsRead(announcements) {
+        const user = getLoggedInUser();
+        const reader = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'Kullanici';
+
+        let storedReads = {};
+        try {
+            storedReads = JSON.parse(localStorage.getItem('announcementReads') || '{}');
+        } catch (error) {
+            storedReads = {};
+        }
+        announcements.forEach(item => {
+            if (item.id) storedReads[item.id] = true;
+        });
+        localStorage.setItem('announcementReads', JSON.stringify(storedReads));
+
+        if (!window.markAnnouncementReadOnSheets || !window.isBildirimSheetsEnabled?.()) return;
+        try {
+            await Promise.all(announcements.filter(item => item.id).map(item =>
+                markAnnouncementReadOnSheets(item.id, reader, user?.email || '')
+            ));
+        } catch (error) {
+            console.error('Okundu bilgisi kaydedilemedi:', error);
+        }
+    }
+
+    function formatAnnouncementCategory(value) {
+        const labels = {
+            operation: 'Isletme',
+            maintenance: 'Bakim',
+            safety: 'Guvenlik',
+            shift: 'Vardiya',
+            general: 'Genel'
+        };
+        return labels[value] || '';
+    }
+
     function updateMotorData() {
         for (const [motorId, data] of Object.entries(motorData)) {
             // Toplam üretim

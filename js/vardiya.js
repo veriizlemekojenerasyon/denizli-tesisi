@@ -9,6 +9,11 @@ function checkAutoRedirect() {
     const redirectTimes = ['15:59', '23:59', '07:59'];
     
     if (redirectTimes.includes(currentTime)) {
+        // Aktif vardiya varken kullaniciyi otomatik cikarma; kayit akisini bozabilir.
+        if (localStorage.getItem('mevcutVardiya')) {
+            console.log('Aktif vardiya var, otomatik yonlendirme atlandi.');
+            return false;
+        }
         console.log(`⏰ Otomatik yönlendirme saati: ${currentTime}`);
         
         // Vardiya İşlem Kaydetme modal'ı açık mı kontrol et
@@ -67,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(checkAutoRedirect, 60000); // Her 60 saniyede bir kontrol et
     
     // Vardiya Google Apps Script URL
-    const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw1IARr4aEfpukBwKYz8PDD_hY_dahyj3mHYUo5QhajNwzjwq6O2Tzbl06xazU4UPl0RA/exec';
+    const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxqivV-pLULefXIYv4HhnxrJtWYIyrmIEHz_cchHBh0QEK18C9KpM7Q8D-Nfd7vzt5pZw/exec';
     
     // Tarih seçicisine otomatik bugünün tarihini atama
     const tarihInput = document.getElementById('tarih');
@@ -94,19 +99,65 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Bugünün tarihini al ve input'a ata (DD.MM.YYYY formatında)
     const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    tarihInput.value = `${day}.${month}.${year}`;
+    tarihInput.value = formatDateTR(today);
 
     // Vardiya kayıtları için varsayılan tarih aralığı (son 30 gün)
-    const otuzGunOnce = new Date();
-    otuzGunOnce.setDate(otuzGunOnce.getDate() - 30);
-    const baslangicYear = otuzGunOnce.getFullYear();
-    const baslangicMonth = String(otuzGunOnce.getMonth() + 1).padStart(2, '0');
-    const baslangicDay = String(otuzGunOnce.getDate()).padStart(2, '0');
-    baslangicTarihInput.value = `${baslangicDay}.${baslangicMonth}.${baslangicYear}`;
-    bitisTarihInput.value = `${day}.${month}.${year}`;
+    setDefaultDateRange();
+
+    function formatDateTR(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${day}.${month}.${year}`;
+    }
+
+    function formatDateInputValue(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function setDefaultDateRange() {
+        const bitis = new Date();
+        const baslangic = new Date();
+        baslangic.setDate(baslangic.getDate() - 30);
+        baslangicTarihInput.value = formatDateInputValue(baslangic);
+        bitisTarihInput.value = formatDateInputValue(bitis);
+    }
+
+    function parseDateValue(value) {
+        if (!value) return null;
+        const text = String(value).trim();
+        const isoParts = text.split('-');
+        if (isoParts.length === 3) {
+            return new Date(Number(isoParts[0]), Number(isoParts[1]) - 1, Number(isoParts[2]));
+        }
+
+        const trParts = text.split('.');
+        if (trParts.length === 3) {
+            return new Date(Number(trParts[2]), Number(trParts[1]) - 1, Number(trParts[0]));
+        }
+
+        return null;
+    }
+
+    function toIsoDateParam(value) {
+        const date = parseDateValue(value);
+        return date ? formatDateInputValue(date) : value;
+    }
+
+    function isActiveStatus(value) {
+        return String(value || '').trim().toLowerCase() === 'aktif';
+    }
+
+    function clearMevcutVardiyaDisplay() {
+        localStorage.removeItem('mevcutVardiya');
+        const mevcutVardiyaDiv = document.getElementById('mevcutVardiya');
+        if (mevcutVardiyaDiv) {
+            mevcutVardiyaDiv.style.display = 'none';
+        }
+    }
 
     // Vardiya seçicisine otomatik değeri ata (saate göre)
     function setVardiyaByHour() {
@@ -172,8 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // Tarih formatını GG.AA.YYYY'den YYYY-AA-GG'ye çevir
-            const tarihParts = selectedTarih.split('.');
-            const formattedTarih = `${tarihParts[2]}-${tarihParts[1]}-${tarihParts[0]}`;
+            const formattedTarih = toIsoDateParam(selectedTarih);
 
             // Mevcut kayıt var mı kontrol et
             const checkUrl = new URL(VARDIYA_APPS_SCRIPT_URL);
@@ -189,6 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Mevcut kaydı bitir
                     const endUrl = new URL(VARDIYA_APPS_SCRIPT_URL);
                     endUrl.searchParams.append('action', 'endVardiya');
+                    endUrl.searchParams.append('id', checkResult.data.id || '');
                     endUrl.searchParams.append('tarih', formattedTarih);
                     endUrl.searchParams.append('vardiya', selectedVardiya);
                     
@@ -259,12 +310,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 try {
                     // Tarih formatını çevir
-                    const tarihParts = vardiya.tarih.split('.');
-                    const formattedTarih = `${tarihParts[2]}-${tarihParts[1]}-${tarihParts[0]}`;
+                    const formattedTarih = toIsoDateParam(vardiya.tarih);
                     
                     // Vardiya bitir API çağrısı
                     const url = new URL(VARDIYA_APPS_SCRIPT_URL);
                     url.searchParams.append('action', 'endVardiya');
+                    url.searchParams.append('id', vardiya.id || '');
                     url.searchParams.append('tarih', formattedTarih);
                     url.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
                     
@@ -281,7 +332,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert('Vardiya başarıyla bitirildi! (ID: ' + result.data.id + ')');
                         haftalikVardiyaKayitlariniGoster();
                     } else {
-                        alert('Hata: ' + (result.error || 'İşlem başarısız!'));
+                        if (String(result.error || '').includes('Aktif vardiya')) {
+                            clearMevcutVardiyaDisplay();
+                            alert('Bu vardiya tarayicida aktif gorunuyordu ancak Google Sheets tarafinda aktif kayit bulunamadi. Eski yerel kayit temizlendi.');
+                            haftalikVardiyaKayitlariniGoster();
+                        } else {
+                            alert('Hata: ' + (result.error || 'İşlem başarısız!'));
+                        }
                     }
                 } catch (error) {
                     console.error('Vardiya bitirme hatası:', error);
@@ -426,8 +483,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Başlangıçta yetki kontrolü yap
     operatorYetkisiKontrolu();
 
-    // Mevcut vardiya bilgisi (localStorage'dan)
-    mevcutVardiyaBilgisi();
+    // Mevcut vardiya bilgisi (Google Sheets ile dogrula)
+    mevcutVardiyaBilgisiDogrula();
 
     // Haftalık vardiya kayıtlarını göster
     haftalikVardiyaKayitlariniGoster();
@@ -440,8 +497,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tarih sıfırla butonu
     tarihSifirlaBtn.addEventListener('click', function() {
         // Tarih alanlarını temizle
-        baslangicTarihInput.value = '';
-        bitisTarihInput.value = '';
+        setDefaultDateRange();
         
         haftalikVardiyaKayitlariniGoster();
     });
@@ -670,6 +726,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // İşlem kaydetme - Google Sheets
+    async function mevcutVardiyaBilgisiDogrula() {
+        const mevcutVardiya = localStorage.getItem('mevcutVardiya');
+        if (!mevcutVardiya) return false;
+
+        try {
+            const vardiya = JSON.parse(mevcutVardiya);
+            const url = new URL(VARDIYA_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'getRecordByDateVardiya');
+            url.searchParams.append('tarih', toIsoDateParam(vardiya.tarih));
+            url.searchParams.append('vardiya', vardiya.vardiya);
+
+            const response = await fetch(url);
+            const result = await response.json();
+            const sheetRecord = result && result.success && result.found ? result.data : null;
+            const sameRecord = sheetRecord && (!vardiya.id || !sheetRecord.id || String(sheetRecord.id) === String(vardiya.id));
+
+            if (sameRecord && isActiveStatus(sheetRecord.durum)) {
+                return mevcutVardiyaBilgisi();
+            }
+
+            clearMevcutVardiyaDisplay();
+            console.warn('Yerel aktif vardiya kaydi Google Sheets ile eslesmedi, temizlendi.', vardiya, sheetRecord);
+            return false;
+        } catch (error) {
+            console.error('Mevcut vardiya dogrulama hatasi:', error);
+            return mevcutVardiyaBilgisi();
+        }
+    }
+
     const islemKaydetmeBtn = document.getElementById('islemKaydetBtn');
     const islemAciklama = document.getElementById('islemAciklama');
 
@@ -801,16 +886,23 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (baslangicTarihInput && bitisTarihInput) {
                 // Kullanıcı tarih seçtiyse o aralıktaki kayıtları göster
-                const baslangicDate = new Date(baslangicTarihInput);
-                const bitisDate = new Date(bitisTarihInput);
+                const baslangicDate = parseDateValue(baslangicTarihInput);
+                const bitisDate = parseDateValue(bitisTarihInput);
+
+                if (!baslangicDate || !bitisDate) {
+                    haftalikVardiyaTableBody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #e74c3c; padding: 20px;">
+                                Tarih araligi gecersiz.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
                     
                 filtrelenmisKayitlar = tumIslemler.filter(vardiya => {
-                    const tarihParts = vardiya.tarih.split('.');
-                    if (tarihParts.length === 3) {
-                        const vardiyaTarihi = new Date(tarihParts[2], tarihParts[1] - 1, tarihParts[0]);
-                        return vardiyaTarihi >= baslangicDate && vardiyaTarihi <= bitisDate;
-                    }
-                    return false;
+                    const vardiyaTarihi = parseDateValue(vardiya.tarih);
+                    return vardiyaTarihi && vardiyaTarihi >= baslangicDate && vardiyaTarihi <= bitisDate;
                 });
             } else {
                 // Tarih girilmediyse kayıtları gösterme

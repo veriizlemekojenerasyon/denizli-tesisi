@@ -58,6 +58,12 @@ function handleRequest(e) {
       case 'sendEmail':
         result = sendEmailAlert(e.parameter);
         break;
+      case 'checkHourlyMissingRecords':
+        result = checkHourlyMissingRecords();
+        break;
+      case 'installHourlyMissingRecordTrigger':
+        result = installHourlyMissingRecordTrigger();
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -243,10 +249,12 @@ function addRecord(data) {
     }
     
     // Kayıt ekle
-    sheet.appendRow(values);
+    var insertRow = findInsertPosition(sheet, formattedTarih, data.saat);
+    sheet.insertRowBefore(insertRow);
+    sheet.getRange(insertRow, 1, 1, 22).setValues([values]);
     
     // Yeni eklenen satırın formatını ayarla
-    var newRow = sheet.getLastRow();
+    var newRow = insertRow;
     var dataRange = sheet.getRange(newRow, 1, 1, 22);
     dataRange.setHorizontalAlignment('center');
     dataRange.setFontSize(10);
@@ -553,6 +561,38 @@ function parseMotorNumber(value) {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function findInsertPosition(sheet, tarih, saat) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return 2;
+  }
+
+  var targetTime = parseRecordDateTime(tarih, saat).getTime();
+  var data = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+
+  for (var i = 0; i < data.length; i++) {
+    var rowTime = parseRecordDateTime(data[i][0], data[i][2]).getTime();
+    if (rowTime > targetTime) {
+      return i + 2;
+    }
+  }
+
+  return lastRow + 1;
+}
+
+function parseRecordDateTime(tarih, saat) {
+  var text = String(tarih || '');
+  var parts = text.indexOf('-') !== -1 ? text.split('-').reverse() : text.split('.');
+  var hourParts = String(saat || '00:00').split(':');
+  return new Date(
+    parseInt(parts[2], 10),
+    parseInt(parts[1], 10) - 1,
+    parseInt(parts[0], 10),
+    parseInt(hourParts[0] || '0', 10),
+    parseInt(hourParts[1] || '0', 10)
+  );
+}
+
 function addMultipleRecords(dataString) {
   try {
     // Verileri parse et
@@ -619,8 +659,9 @@ function addMultipleRecords(dataString) {
         rowData[19] = record.durum || 'MOTOR ÇALIŞMIYOR';
         
         // Satırı ekle
-        sheet.appendRow(rowData);
-        var newRow = sheet.getLastRow();
+        var newRow = findInsertPosition(sheet, tarih, record.saat);
+        sheet.insertRowBefore(newRow);
+        sheet.getRange(newRow, 1, 1, 22).setValues([rowData]);
         var dataRange = sheet.getRange(newRow, 1, 1, 22);
         dataRange.setHorizontalAlignment('center');
         dataRange.setFontSize(10);
@@ -679,6 +720,110 @@ function addMultipleRecords(dataString) {
 }
 
 // 🔥 Tarihleri renklendirme fonksiyonu
+function checkHourlyMissingRecords() {
+  try {
+    var now = new Date();
+    var minute = now.getMinutes();
+    if (minute < 55) {
+      return { success: true, skipped: true, message: 'Kontrol dakikasi degil' };
+    }
+
+    var hour = now.getHours();
+    var saat = pad2(hour) + ':00';
+    var tarih = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+    var vardiya = getVardiyaByHour(hour);
+    var sentKey = 'kojenMotorHourlyCheck:' + tarih + ':' + saat;
+    var props = PropertiesService.getScriptProperties();
+
+    if (props.getProperty(sentKey)) {
+      return { success: true, skipped: true, message: 'Bu saat daha once kontrol edildi' };
+    }
+
+    var motors = ['GM-1', 'GM-2', 'GM-3'];
+    var missing = [];
+    for (var i = 0; i < motors.length; i++) {
+      var exists = checkExistingRecord(motors[i], tarih, saat);
+      if (!exists.success || !exists.exists) {
+        missing.push(motors[i]);
+      }
+    }
+
+    if (missing.length === 0) {
+      props.setProperty(sentKey, new Date().toISOString());
+      return { success: true, missingCount: 0, addedCount: 0, message: 'Eksik motor kaydi yok' };
+    }
+
+    var added = [];
+    var errors = [];
+    for (var j = 0; j < missing.length; j++) {
+      var motor = missing[j];
+      var autoData = {
+        tarih: tarih,
+        vardiya: vardiya,
+        saat: saat,
+        motor: motor,
+        kaydeden: 'OTOMATIK SISTEM',
+        durum: 'MOTOR ÇALIŞMIYOR'
+      };
+      var addResult = addRecord(autoData);
+      if (addResult.success) {
+        added.push(motor);
+      } else {
+        errors.push(motor + ': ' + addResult.error);
+      }
+    }
+
+    var subject = 'Kojen Motor Veri Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
+    var body = 'Kojen Motor Veri Uyarisi\n\n' +
+      'Tarih: ' + tarih + '\n' +
+      'Saat: ' + saat + '\n' +
+      'Vardiya: ' + vardiya + '\n\n' +
+      'Eksik motor kayitlari: ' + missing.join(', ') + '\n' +
+      'Otomatik bos kayit eklenenler: ' + (added.length ? added.join(', ') : '-') + '\n' +
+      (errors.length ? 'Kayit hatalari: ' + errors.join('; ') + '\n' : '') +
+      '\nBu saat icin veri girilmedigi icin sistem otomatik bos kayit olusturdu.';
+
+    var mailResult = sendEmailAlert({ subject: subject, body: body });
+    props.setProperty(sentKey, new Date().toISOString());
+
+    return {
+      success: true,
+      missingCount: missing.length,
+      addedCount: added.length,
+      errors: errors,
+      mail: mailResult
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function installHourlyMissingRecordTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  ScriptApp.newTrigger('checkHourlyMissingRecords')
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  return { success: true, message: 'Motor saatlik eksik kayit tetikleyicisi kuruldu' };
+}
+
+function getVardiyaByHour(hour) {
+  if (hour >= 8 && hour < 16) return '08-16';
+  if (hour >= 16 && hour < 24) return '16-24';
+  return '24-08';
+}
+
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
 function colorizeDates(sheet, addedRecords) {
   try {
     // Tarihleri grupla
