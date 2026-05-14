@@ -6,6 +6,7 @@
     <title>Saatlik Veri Girişi - Kojenerasyon</title>
     <link rel="stylesheet" href="css/saatlik-veri-giris.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/mobile-system.css">
 </head>
 <body>
     <div class="dashboard-container">
@@ -129,6 +130,28 @@
                 <section class="data-entry-section">
                     <h2 class="section-title">Saatlik Veri Giriş Formu</h2>
                     
+
+                    <div class="mobile-quick-panel" aria-label="Mobil hizli giris paneli">
+                        <div class="quick-panel-header">
+                            <div>
+                                <span class="quick-eyebrow">Mobil hizli giris</span>
+                                <h3>Eksik saatler ve tek dokunus</h3>
+                            </div>
+                            <button type="button" class="quick-refresh-btn" id="refreshMissingHoursBtn">Yenile</button>
+                        </div>
+                        <div class="quick-actions">
+                            <button type="button" class="quick-action-btn primary" id="quickCurrentHourBtn">Simdiki Saati Hazirla</button>
+                            <button type="button" class="quick-action-btn" id="quickPreviousHourBtn">Onceki Saati Hazirla</button>
+                            <button type="button" class="quick-action-btn danger" id="quickZeroRecordBtn">Sifir Kayit Hazirla</button>
+                        </div>
+                        <div class="missing-hours-box">
+                            <div class="missing-hours-title">Eksik kalan saatler</div>
+                            <div class="missing-hours-list" id="missingHoursList">
+                                <button type="button" class="missing-hour-chip loading">Yukleniyor...</button>
+                            </div>
+                        </div>
+                    </div>
+
                     <form id="saatlikVeriForm" class="data-form">
                         <!-- Tarih ve Saat Bilgileri -->
                         <div class="form-row">
@@ -230,5 +253,6 @@
     <script src="js/global-duyurular.js"></script>
     <script src="js/auto-refresh.js"></script>
     <script src="js/admin-menu-visibility.js"></script>
+    <script src="js/logout-system.js"></script>
 </body>
 </html>

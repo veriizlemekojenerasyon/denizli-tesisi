@@ -8,7 +8,7 @@
 // ============================================
 const SAATLIK_CONFIG = {
     // Google Apps Script Web App URL
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxzi0Shn7YvWSWzOv_rDiRHE6WlqiP6Tw7TDCyWC3_34AlFgB4-tzsZjn2JkRShqsd2jQ/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzaIRgb1ip6MwKh05rs1xYsSPjAXXQDiQYRUX-qm1cneDDoTBNG3xN27ayT8m21r5vUhg/exec',
     
     // Sayfa başlığı
     PAGE_NAME: 'Saatlik Veri Girişi',
@@ -30,6 +30,7 @@ const SaatlikApp = {
     init: function() {
         console.log('SaatlikApp başlatılıyor...');
         
+        this.manualSlotSelected = false;
         this.setupEventListeners();
         this.setInitialValues();
         this.loadLastRecords();
@@ -42,12 +43,29 @@ const SaatlikApp = {
         const form = document.getElementById('saatlikVeriForm');
         if (form) {
             form.addEventListener('submit', (e) => this.handleFormSubmit(e));
+            form.addEventListener('reset', () => {
+                this.manualSlotSelected = false;
+                setTimeout(() => this.setInitialValues(), 0);
+            });
         }
+
+        const quickCurrentHourBtn = document.getElementById('quickCurrentHourBtn');
+        const quickPreviousHourBtn = document.getElementById('quickPreviousHourBtn');
+        const quickZeroRecordBtn = document.getElementById('quickZeroRecordBtn');
+        const refreshMissingHoursBtn = document.getElementById('refreshMissingHoursBtn');
+
+        if (quickCurrentHourBtn) quickCurrentHourBtn.addEventListener('click', () => this.prepareQuickSlot(0));
+        if (quickPreviousHourBtn) quickPreviousHourBtn.addEventListener('click', () => this.prepareQuickSlot(-1));
+        if (quickZeroRecordBtn) quickZeroRecordBtn.addEventListener('click', () => this.prepareZeroRecord());
+        if (refreshMissingHoursBtn) refreshMissingHoursBtn.addEventListener('click', () => this.loadLastRecords());
         
         const tarihInput = document.getElementById('tarih');
         
         if (tarihInput) {
-            tarihInput.addEventListener('change', () => this.checkExistingRecord());
+            tarihInput.addEventListener('change', () => {
+                this.manualSlotSelected = true;
+                this.checkExistingRecord();
+            });
         }
         
         const sidebarLogout = document.getElementById('sidebarLogout');
@@ -82,6 +100,58 @@ const SaatlikApp = {
             vardiyaSelect.value = this.getVardiyaByHour(today.getHours());
         }
     },
+
+    prepareQuickSlot: function(hourOffset) {
+        const date = new Date();
+        date.setHours(date.getHours() + hourOffset, 0, 0, 0);
+        this.fillSlot(date);
+        this.showNotification('Hazir', `${this.formatDateTR(date)} ${this.formatHour(date)} forma alindi`, 'info');
+    },
+
+    prepareZeroRecord: function() {
+        const target = this.manualSlotSelected ? this.getSelectedSlotDate() : new Date();
+        this.fillSlot(target);
+        const aktifInput = document.getElementById('aktifMwh');
+        const reaktifInput = document.getElementById('reaktifMwh');
+        const notlarInput = document.getElementById('notlar');
+        if (aktifInput) aktifInput.value = '0.000';
+        if (reaktifInput) reaktifInput.value = '0.000';
+        if (notlarInput) notlarInput.value = 'KAYIT GIRILMEDI';
+        this.showNotification('Sifir kayit hazir', 'Kontrol edip Kaydet butonuna dokunabilirsiniz.', 'warning');
+    },
+
+    fillSlot: function(date) {
+        const tarihInput = document.getElementById('tarih');
+        const saatInput = document.getElementById('saat');
+        const vardiyaSelect = document.getElementById('vardiya');
+        if (tarihInput) tarihInput.value = this.formatDateISO(date);
+        if (saatInput) saatInput.value = this.formatHour(date);
+        if (vardiyaSelect) vardiyaSelect.value = this.getVardiyaByHour(date.getHours());
+        this.manualSlotSelected = true;
+        this.lockForm(false);
+    },
+
+    getSelectedSlotDate: function() {
+        const tarihInput = document.getElementById('tarih');
+        const saatInput = document.getElementById('saat');
+        const value = tarihInput?.value || this.formatDateISO(new Date());
+        const hour = parseInt((saatInput?.value || this.getCurrentHourRounded()).split(':')[0], 10) || 0;
+        const date = new Date(value + 'T00:00:00');
+        date.setHours(hour, 0, 0, 0);
+        return date;
+    },
+
+    formatDateISO: function(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    },
+
+    formatDateTR: function(date) {
+        return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+    },
+
+    formatHour: function(date) {
+        return `${String(date.getHours()).padStart(2, '0')}:00`;
+    },
     
     getCurrentHourRounded: function() {
         return String(new Date().getHours()).padStart(2, '0') + ':00';
@@ -100,7 +170,9 @@ const SaatlikApp = {
     
     handleFormSubmit: async function(e) {
         e.preventDefault();
-        this.syncCurrentDateTime();
+        if (!this.manualSlotSelected) {
+            this.syncCurrentDateTime();
+        }
         
         const submitBtn = document.getElementById('submitBtn');
         const originalBtnText = submitBtn ? submitBtn.textContent : 'Kaydet';
@@ -297,17 +369,73 @@ const SaatlikApp = {
             
             if (result.success) {
                 this.renderTable(result.data);
+                this.renderMissingHours(result.data);
             } else {
                 tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">Kayıtlar yüklenemedi.</td></tr>';
+                this.renderMissingHours([]);
             }
         } catch (error) {
             console.error('Kayıtlar yüklenirken hata:', error);
             // Hata durumunda localStorage'dan göster
             const records = JSON.parse(localStorage.getItem('saatlikVeriler') || '[]');
             this.renderTable(records);
+            this.renderMissingHours(records);
         }
     },
     
+    renderMissingHours: function(records) {
+        const list = document.getElementById('missingHoursList');
+        if (!list) return;
+
+        const existing = new Set((records || []).map(record => {
+            return `${this.normalizeDateKey(record.tarih)}|${String(record.saat || '').trim()}`;
+        }));
+
+        const missing = [];
+        const base = new Date();
+        if (base.getMinutes() < 55) {
+            base.setHours(base.getHours() - 1);
+        }
+
+        for (let i = 0; i < 12; i++) {
+            const date = new Date(base);
+            date.setHours(date.getHours() - i, 0, 0, 0);
+            const key = `${this.formatDateTR(date)}|${this.formatHour(date)}`;
+            if (!existing.has(key)) {
+                missing.push(date);
+            }
+        }
+
+        if (!missing.length) {
+            list.innerHTML = '<button type="button" class="missing-hour-chip ok">Son 12 saatte eksik yok</button>';
+            return;
+        }
+
+        list.innerHTML = missing.slice(0, 8).map(date => {
+            const iso = this.formatDateISO(date);
+            const hour = this.formatHour(date);
+            return `<button type="button" class="missing-hour-chip" data-date="${iso}" data-hour="${hour}">${this.formatDateTR(date)} ${hour}</button>`;
+        }).join('');
+
+        list.querySelectorAll('[data-date][data-hour]').forEach(button => {
+            button.addEventListener('click', () => {
+                const date = new Date(button.dataset.date + 'T00:00:00');
+                date.setHours(parseInt(button.dataset.hour.split(':')[0], 10), 0, 0, 0);
+                this.fillSlot(date);
+                this.showNotification('Eksik saat secildi', `${this.formatDateTR(date)} ${this.formatHour(date)} forma alindi`, 'warning');
+            });
+        });
+    },
+
+    normalizeDateKey: function(value) {
+        const text = String(value || '').trim();
+        if (text.includes('-')) {
+            const parts = text.slice(0, 10).split('-');
+            if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+        }
+        return text.slice(0, 10);
+    },
+
     renderTable: function(records) {
         const tableBody = document.getElementById('recordsTableBody');
         if (!tableBody) return;

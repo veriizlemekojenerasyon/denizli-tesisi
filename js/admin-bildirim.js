@@ -204,11 +204,13 @@ function renderAnnouncements() {
                 <span class="badge">${formatPageTarget(item.pageTarget)}</span>
                 <span class="badge">${formatPriority(item.priority)}</span>
                 <span class="badge">${getReadCount(item)} okundu</span>
+                <span class="badge">${item.completed ? 'Tamamlandi' : 'Bekliyor'}</span>
                 <span class="badge">${item.active === false ? 'Pasif' : 'Aktif'}</span>
             </div>
             ${item.attachmentUrl ? `<a class="attachment-link" href="${escapeHtml(item.attachmentUrl)}" target="_blank" rel="noopener">${escapeHtml(item.attachmentName || 'Eki ac')}</a>` : ''}
             <div class="card-actions">
                 <button type="button" class="btn btn-secondary" data-action="toggle" data-id="${item.id}">${item.active === false ? 'Yayinla' : 'Pasif Yap'}</button>
+                <button type="button" class="btn btn-secondary" data-action="complete" data-id="${item.id}">Tamamlandi</button>
                 <button type="button" class="btn btn-primary" data-action="edit" data-id="${item.id}">Duzenle</button>
                 <button type="button" class="btn btn-danger" data-action="delete" data-id="${item.id}">Sil</button>
             </div>
@@ -263,6 +265,28 @@ async function handleListAction(event) {
         item.updatedAt = new Date().toISOString();
         persistAnnouncements();
         window.SystemAuditLog?.write?.('Bildirim durumu degisti', item.title || id, 'ok');
+        renderAnnouncements();
+        return;
+    }
+
+    if (action === 'complete') {
+        if (window.completeAnnouncementOnSheets && window.isBildirimSheetsEnabled?.()) {
+            const result = await completeAnnouncementOnSheets(id, getCurrentUserName(), currentUser?.email || '');
+            if (!result.success) {
+                alert('Bildirim tamamlanamadi: ' + (result.error || 'Bilinmeyen hata'));
+                return;
+            }
+            window.SystemAuditLog?.write?.('Bildirim tamamlandi', item.title || id, 'ok');
+            await loadAnnouncements();
+            return;
+        }
+
+        item.completed = true;
+        item.completedBy = item.completedBy || [];
+        item.completedBy.push({ reader: getCurrentUserName(), email: currentUser?.email || '', readAt: new Date().toISOString() });
+        item.updatedAt = new Date().toISOString();
+        persistAnnouncements();
+        window.SystemAuditLog?.write?.('Bildirim tamamlandi', item.title || id, 'ok');
         renderAnnouncements();
         return;
     }

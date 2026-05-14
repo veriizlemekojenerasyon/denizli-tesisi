@@ -13,7 +13,13 @@ var ANNOUNCEMENTS_SHEET_NAME = 'VardiyaBildirimleri';
 var ANNOUNCEMENT_HEADERS = [
   'ID', 'Baslangic Tarihi', 'Bitis Tarihi', 'Vardiya', 'Metin', 'Kategori',
   'Oncelik', 'Hedef', 'Aktif', 'Ek URL', 'Ek Adi', 'Okuyanlar',
-  'Olusturan', 'Olusturma Zamani', 'Guncelleme Zamani', 'Sayfa Hedefi'
+  'Olusturan', 'Olusturma Zamani', 'Guncelleme Zamani', 'Sayfa Hedefi',
+  'Tamamlayanlar', 'Tamamlandi'
+];
+var SYSTEM_LOGS_SHEET_NAME = 'SistemLoglari';
+var SYSTEM_LOG_HEADERS = [
+  'Kayit Zamani', 'Tarih', 'Saat', 'Modul', 'Eksik Kayit',
+  'Otomatik Kayit Sonucu', 'Mail Sonucu', 'Hata Mesaji', 'Detay'
 ];
 
 function doGet(e) {
@@ -53,6 +59,15 @@ function handleRequest(e) {
         break;
       case 'markAnnouncementRead':
         result = markAnnouncementRead(e.parameter);
+        break;
+      case 'completeAnnouncement':
+        result = completeAnnouncement(e.parameter);
+        break;
+      case 'addSystemLog':
+        result = addSystemLog(e.parameter);
+        break;
+      case 'getSystemLogs':
+        result = getSystemLogs(parseInt(e.parameter.count, 10) || 100);
         break;
       default:
         result = { success: false, error: 'Gecersiz islem' };
@@ -103,6 +118,16 @@ function getOrCreateAnnouncementsSheet() {
 function migrateAnnouncementsSheet(sheet) {
   var lastColumn = sheet.getLastColumn();
   var currentHeaders = sheet.getRange(1, 1, 1, Math.max(lastColumn, 1)).getDisplayValues()[0];
+  if (currentHeaders[1] === 'Baslangic Tarihi' && lastColumn < ANNOUNCEMENT_HEADERS.length && lastColumn >= 16) {
+    for (var addCol = lastColumn + 1; addCol <= ANNOUNCEMENT_HEADERS.length; addCol++) {
+      sheet.getRange(1, addCol).setValue(ANNOUNCEMENT_HEADERS[addCol - 1]);
+      if (sheet.getLastRow() > 1 && addCol === 18) {
+        sheet.getRange(2, addCol, sheet.getLastRow() - 1, 1).setValue('FALSE');
+      }
+    }
+    sheet.getRange(2, 1, Math.max(1000, sheet.getLastRow()), ANNOUNCEMENT_HEADERS.length).setNumberFormat('@');
+    return;
+  }
   if (currentHeaders[1] === 'Baslangic Tarihi' && lastColumn === ANNOUNCEMENT_HEADERS.length - 1) {
     sheet.getRange(1, ANNOUNCEMENT_HEADERS.length).setValue('Sayfa Hedefi');
     if (sheet.getLastRow() > 1) {
@@ -118,7 +143,7 @@ function migrateAnnouncementsSheet(sheet) {
   var migratedRows = oldRows.map(function(row) {
     return [
       row[0], row[1], '', row[2], row[3], 'general', row[4] || 'normal',
-      row[5] || 'all', row[6], '', '', '', row[7], row[8], row[9], 'all'
+      row[5] || 'all', row[6], '', '', '', row[7], row[8], row[9], 'all', '', 'FALSE'
     ];
   });
 
@@ -194,7 +219,9 @@ function addAnnouncement(data) {
       data.createdBy || 'Admin',
       data.createdAt || now,
       now,
-      data.pageTarget || 'all'
+      data.pageTarget || 'all',
+      '',
+      'FALSE'
     ]);
 
     formatAnnouncementRow(sheet, sheet.getLastRow());
@@ -231,7 +258,9 @@ function updateAnnouncement(data) {
       data.createdBy || existing.createdBy || 'Admin',
       existing.createdAt || now,
       now,
-      data.pageTarget || existing.pageTarget || 'all'
+      data.pageTarget || existing.pageTarget || 'all',
+      existing.completedByText || '',
+      normalizeCompleted(data.completed !== undefined ? data.completed : existing.completed)
     ]];
 
     sheet.getRange(row, 1, 1, ANNOUNCEMENT_HEADERS.length).setValues(values);
@@ -306,6 +335,7 @@ function findRowById(sheet, id) {
 
 function rowToAnnouncement(row) {
   var readByText = row[11] || '';
+  var completedByText = row[16] || '';
   return {
     id: row[0],
     date: row[1],
@@ -325,7 +355,10 @@ function rowToAnnouncement(row) {
     createdBy: row[12],
     createdAt: row[13],
     updatedAt: row[14],
-    pageTarget: row[15] || 'all'
+    pageTarget: row[15] || 'all',
+    completedByText: completedByText,
+    completedBy: parseReadBy(completedByText),
+    completed: String(row[17]).toLowerCase() === 'true' || String(row[17]).toLowerCase() === 'tamamlandi'
   };
 }
 
@@ -377,6 +410,104 @@ function markAnnouncementRead(data) {
   }
 }
 
+function completeAnnouncement(data) {
+  try {
+    if (!data.id) return { success: false, error: 'ID zorunludur' };
+    var sheet = getOrCreateAnnouncementsSheet();
+    var row = findRowById(sheet, data.id);
+    if (!row) return { success: false, error: 'Bildirim bulunamadi' };
+
+    var user = data.reader || data.email || data.completedBy || 'Kullanici';
+    var email = data.email || '';
+    var key = email || user;
+    var entries = parseReadBy(sheet.getRange(row, 17).getDisplayValue());
+    var exists = entries.some(function(entry) {
+      return entry.key === key;
+    });
+
+    if (!exists) {
+      entries.push({
+        key: key,
+        reader: user,
+        email: email,
+        readAt: formatDateTimeTR(new Date())
+      });
+    }
+
+    sheet.getRange(row, 17).setValue(stringifyReadBy(entries));
+    sheet.getRange(row, 18).setValue('TRUE');
+    sheet.getRange(row, 15).setValue(formatDateTimeTR(new Date()));
+    formatAnnouncementRow(sheet, row);
+
+    return { success: true, data: getAnnouncementById(data.id), message: 'Bildirim tamamlandi' };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getOrCreateSystemLogsSheet() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getSheetByName(SYSTEM_LOGS_SHEET_NAME);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(SYSTEM_LOGS_SHEET_NAME);
+    sheet.appendRow(SYSTEM_LOG_HEADERS);
+    var headerRange = sheet.getRange(1, 1, 1, SYSTEM_LOG_HEADERS.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#0f172a');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setHorizontalAlignment('center');
+    sheet.getRange(2, 1, 1000, SYSTEM_LOG_HEADERS.length).setNumberFormat('@');
+  }
+  return sheet;
+}
+
+function addSystemLog(data) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    sheet.appendRow([
+      formatDateTimeTR(new Date()),
+      normalizeDate(data.tarih || data.date || ''),
+      data.saat || data.hour || '',
+      data.modul || data.module || '',
+      data.eksikKayit || data.missing || '',
+      data.otomatikKayitSonucu || data.autoResult || '',
+      data.mailSonucu || data.mailResult || '',
+      data.hataMesaji || data.error || '',
+      data.detay || data.detail || ''
+    ]);
+    return { success: true, message: 'Sistem logu eklendi' };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getSystemLogs(count) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, data: [] };
+    var rowCount = Math.min(count || 100, lastRow - 1);
+    var startRow = Math.max(2, lastRow - rowCount + 1);
+    var rows = sheet.getRange(startRow, 1, rowCount, SYSTEM_LOG_HEADERS.length).getDisplayValues();
+    var data = rows.map(function(row) {
+      return {
+        kayitZamani: row[0],
+        tarih: row[1],
+        saat: row[2],
+        modul: row[3],
+        eksikKayit: row[4],
+        otomatikKayitSonucu: row[5],
+        mailSonucu: row[6],
+        hataMesaji: row[7],
+        detay: row[8]
+      };
+    }).reverse();
+    return { success: true, data: data };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
 function parseReadBy(value) {
   if (!value) return [];
   return String(value).split('||').filter(Boolean).map(function(part) {
@@ -419,6 +550,10 @@ function normalizeActive(value) {
   if (value === false) return 'FALSE';
   var text = String(value);
   return (text.toLowerCase() === 'false' || text.toLowerCase() === 'pasif') ? 'FALSE' : 'TRUE';
+}
+
+function normalizeCompleted(value) {
+  return (value === true || String(value).toLowerCase() === 'true' || String(value).toLowerCase() === 'tamamlandi') ? 'TRUE' : 'FALSE';
 }
 
 function normalizeDate(value) {

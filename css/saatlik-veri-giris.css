@@ -364,6 +364,126 @@ body {
     gap: 30px;
 }
 
+.mobile-quick-panel {
+    display: none;
+    margin-bottom: 28px;
+    padding: 22px;
+    border: 1px solid #dbeafe;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.12);
+}
+
+.quick-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.quick-eyebrow {
+    display: block;
+    margin-bottom: 4px;
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.quick-panel-header h3 {
+    margin: 0;
+    color: #1e293b;
+    font-size: 18px;
+    line-height: 1.25;
+}
+
+.quick-refresh-btn,
+.quick-action-btn,
+.missing-hour-chip {
+    min-height: 48px;
+    border: 0;
+    border-radius: 12px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quick-refresh-btn {
+    flex: 0 0 auto;
+    padding: 0 16px;
+    color: #1d4ed8;
+    background: #dbeafe;
+}
+
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.quick-action-btn {
+    padding: 14px;
+    color: #1f2937;
+    background: #e5e7eb;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.quick-action-btn.primary {
+    color: #ffffff;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+}
+
+.quick-action-btn.danger {
+    color: #ffffff;
+    background: linear-gradient(135deg, #ef4444, #b91c1c);
+}
+
+.quick-refresh-btn:hover,
+.quick-action-btn:hover,
+.missing-hour-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+}
+
+.missing-hours-box {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #e2e8f0;
+}
+
+.missing-hours-title {
+    margin-bottom: 10px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.missing-hours-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.missing-hour-chip {
+    padding: 0 14px;
+    color: #92400e;
+    background: #fef3c7;
+}
+
+.missing-hour-chip.ok {
+    color: #166534;
+    background: #dcfce7;
+}
+
+.missing-hour-chip.loading {
+    color: #475569;
+    background: #e2e8f0;
+    cursor: default;
+}
+
 .form-section {
     background: #ffffff;
     border-radius: 15px;
@@ -554,6 +674,25 @@ body {
     
     .data-entry-section {
         padding: 25px;
+    }
+
+    .mobile-quick-panel {
+        display: block;
+    }
+
+    .quick-panel-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .quick-refresh-btn,
+    .quick-action-btn {
+        width: 100%;
+        font-size: 15px;
+    }
+
+    .quick-actions {
+        grid-template-columns: 1fr;
     }
     
     .form-row {

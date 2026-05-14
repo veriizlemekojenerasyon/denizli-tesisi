@@ -1,5 +1,5 @@
 const BildirimSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbwX6YHedLGqu6N5YEajQPFqVE1eV8Zj2TK0LlexESUkzM1ISNSBPKdnEtvG58VDnhXj/exec'
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec'
 };
 
 function isBildirimSheetsEnabled() {
@@ -43,6 +43,26 @@ async function markAnnouncementReadOnSheets(id, reader, email = '') {
     return postAnnouncementAction('markAnnouncementRead', { id, reader, email });
 }
 
+async function completeAnnouncementOnSheets(id, reader, email = '') {
+    return postAnnouncementAction('completeAnnouncement', { id, reader, email });
+}
+
+async function addSystemLogToSheets(data) {
+    return postAnnouncementAction('addSystemLog', data);
+}
+
+async function fetchSystemLogsFromSheets(count = 100) {
+    if (!isBildirimSheetsEnabled()) {
+        return { success: false, fallback: true, error: 'Bildirim Apps Script URL tanimli degil' };
+    }
+
+    const url = new URL(BildirimSheetsConfig.WEB_APP_URL);
+    url.searchParams.append('action', 'getSystemLogs');
+    url.searchParams.append('count', String(count));
+    const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+    return response.json();
+}
+
 async function postAnnouncementAction(action, data) {
     if (!isBildirimSheetsEnabled()) {
         return { success: false, fallback: true, error: 'Bildirim Apps Script URL tanimli degil' };
@@ -74,3 +94,6 @@ window.deleteAnnouncementFromSheets = deleteAnnouncementFromSheets;
 window.setAnnouncementActiveOnSheets = setAnnouncementActiveOnSheets;
 window.clearInactiveAnnouncementsOnSheets = clearInactiveAnnouncementsOnSheets;
 window.markAnnouncementReadOnSheets = markAnnouncementReadOnSheets;
+window.completeAnnouncementOnSheets = completeAnnouncementOnSheets;
+window.addSystemLogToSheets = addSystemLogToSheets;
+window.fetchSystemLogsFromSheets = fetchSystemLogsFromSheets;

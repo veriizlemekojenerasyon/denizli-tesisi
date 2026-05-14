@@ -64,6 +64,9 @@ function handleRequest(e) {
       case 'installHourlyMissingRecordTrigger':
         result = installHourlyMissingRecordTrigger();
         break;
+      case 'getSystemLogs':
+        result = getSystemLogs(parseInt(e.parameter.count, 10) || 100);
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -735,14 +738,10 @@ function addMultipleRecords(dataString) {
 function checkHourlyMissingRecords() {
   try {
     var now = new Date();
-    var minute = now.getMinutes();
-    if (minute < 55) {
-      return { success: true, skipped: true, message: 'Kontrol dakikasi degil' };
-    }
-
-    var hour = now.getHours();
-    var saat = pad2(hour) + ':00';
-    var tarih = Utilities.formatDate(now, Session.getScriptTimeZone(), 'dd.MM.yyyy');
+    var target = getHourlyCheckTarget(now);
+    var hour = target.hour;
+    var saat = target.saat;
+    var tarih = target.tarih;
     var vardiya = getVardiyaByHour(hour);
     var sentKey = 'kojenEnerjiHourlyCheck:' + tarih + ':' + saat;
     var props = PropertiesService.getScriptProperties();
@@ -762,6 +761,15 @@ function checkHourlyMissingRecords() {
 
     if (missing.length === 0) {
       props.setProperty(sentKey, new Date().toISOString());
+      addSystemLog({
+        tarih: tarih,
+        saat: saat,
+        modul: 'Kojen Enerji',
+        eksikKayit: 'Yok',
+        otomatikKayitSonucu: 'Gerekmedi',
+        mailSonucu: 'Gonderilmedi',
+        detay: 'Eksik enerji kaydi yok'
+      });
       return { success: true, missingCount: 0, addedCount: 0, message: 'Eksik enerji kaydi yok' };
     }
 
@@ -801,6 +809,16 @@ function checkHourlyMissingRecords() {
 
     var mailResult = sendEmailAlert({ subject: subject, body: body });
     props.setProperty(sentKey, new Date().toISOString());
+    addSystemLog({
+      tarih: tarih,
+      saat: saat,
+      modul: 'Kojen Enerji',
+      eksikKayit: missing.join(', '),
+      otomatikKayitSonucu: added.length + '/' + missing.length + ' basarili',
+      mailSonucu: mailResult.success ? 'Basarili' : 'Basarisiz',
+      hataMesaji: errors.concat(mailResult.success ? [] : [mailResult.error]).join('; '),
+      detay: 'Otomatik motor calismiyor enerji kaydi'
+    });
 
     return {
       success: true,
@@ -809,6 +827,66 @@ function checkHourlyMissingRecords() {
       errors: errors,
       mail: mailResult
     };
+  } catch (error) {
+    addSystemLog({
+      modul: 'Kojen Enerji',
+      otomatikKayitSonucu: 'Hata',
+      mailSonucu: 'Bilinmiyor',
+      hataMesaji: error.toString(),
+      detay: 'checkHourlyMissingRecords'
+    });
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getOrCreateSystemLogsSheet() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getSheetByName('SistemLoglari');
+  var headers = ['Kayit Zamani', 'Tarih', 'Saat', 'Modul', 'Eksik Kayit', 'Otomatik Kayit Sonucu', 'Mail Sonucu', 'Hata Mesaji', 'Detay'];
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet('SistemLoglari');
+    sheet.appendRow(headers);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#0f172a');
+    headerRange.setFontColor('#ffffff');
+    sheet.getRange(2, 1, 1000, headers.length).setNumberFormat('@');
+  }
+  return sheet;
+}
+
+function addSystemLog(data) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    sheet.appendRow([
+      Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm:ss'),
+      data.tarih || data.date || '',
+      data.saat || data.hour || '',
+      data.modul || data.module || 'Kojen Enerji',
+      data.eksikKayit || data.missing || '',
+      data.otomatikKayitSonucu || data.autoResult || '',
+      data.mailSonucu || data.mailResult || '',
+      data.hataMesaji || data.error || '',
+      data.detay || data.detail || ''
+    ]);
+    return { success: true, message: 'Sistem logu eklendi' };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getSystemLogs(count) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, data: [] };
+    var rowCount = Math.min(count || 100, lastRow - 1);
+    var startRow = Math.max(2, lastRow - rowCount + 1);
+    var rows = sheet.getRange(startRow, 1, rowCount, 9).getDisplayValues();
+    var data = rows.map(function(row) {
+      return { kayitZamani: row[0], tarih: row[1], saat: row[2], modul: row[3], eksikKayit: row[4], otomatikKayitSonucu: row[5], mailSonucu: row[6], hataMesaji: row[7], detay: row[8] };
+    }).reverse();
+    return { success: true, data: data };
   } catch (error) {
     return { success: false, error: error.toString() };
   }
@@ -834,6 +912,18 @@ function getVardiyaByHour(hour) {
   if (hour >= 8 && hour < 16) return '08-16';
   if (hour >= 16 && hour < 24) return '16-24';
   return '24-08';
+}
+
+function getHourlyCheckTarget(date) {
+  var target = new Date(date);
+  if (target.getMinutes() < 55) {
+    target.setHours(target.getHours() - 1);
+  }
+  return {
+    hour: target.getHours(),
+    saat: pad2(target.getHours()) + ':00',
+    tarih: Utilities.formatDate(target, Session.getScriptTimeZone(), 'dd.MM.yyyy')
+  };
 }
 
 function getLastNormalRecordBefore(motor, tarih, saat) {

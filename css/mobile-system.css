@@ -1,0 +1,261 @@
+/* Shared tablet and phone touch improvements across the system. */
+
+@media (max-width: 1024px) {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        overscroll-behavior-y: contain;
+    }
+
+    .dashboard-container {
+        min-width: 0;
+    }
+
+    .main-content,
+    .dashboard-content,
+    main,
+    .container,
+    .admin-shell {
+        min-width: 0;
+    }
+
+    .header-top,
+    .page-header,
+    .admin-header {
+        gap: 16px;
+    }
+
+    .sidebar {
+        flex: 0 0 auto;
+    }
+
+    .sidebar-menu {
+        scrollbar-width: thin;
+    }
+
+    .menu-link,
+    .btn,
+    .submit-btn,
+    .reset-btn,
+    .login-btn,
+    .logout-btn,
+    .form-btn,
+    .motor-btn,
+    .btn-kaydet,
+    button,
+    a.btn {
+        min-height: 44px;
+        touch-action: manipulation;
+    }
+
+    input,
+    select,
+    textarea {
+        min-height: 44px;
+        font-size: 16px;
+    }
+
+    textarea {
+        min-height: 96px;
+    }
+
+    .form-row,
+    .form-grid,
+    .panel-grid,
+    .summary-cards,
+    .motor-cards,
+    .stats-container,
+    .top-dashboard-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .form-actions,
+    .header-actions,
+    .card-actions,
+    .quick-links,
+    .form-buttons {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .form-actions > *,
+    .header-actions > .btn,
+    .card-actions > .btn,
+    .quick-links > a {
+        flex: 1 1 180px;
+    }
+
+    .table-container,
+    .kojen-table-container,
+    .vardiya-table-container,
+    .log-table-wrap,
+    .report-table-container,
+    .stock-list-container {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+        min-width: 720px;
+    }
+
+    .modal-content {
+        width: min(94vw, 680px);
+        max-height: 88vh;
+        overflow-y: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100% !important;
+        max-height: none;
+        position: relative;
+    }
+
+    .sidebar-header {
+        padding: 16px;
+    }
+
+    .sidebar .logo,
+    .logo {
+        width: 72px;
+        height: 72px;
+    }
+
+    .company-name {
+        font-size: 13px;
+    }
+
+    .sidebar-menu {
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 10px;
+    }
+
+    .menu-item {
+        flex: 0 0 auto;
+        margin: 0 8px 0 0;
+        padding: 0;
+    }
+
+    .menu-link {
+        min-width: 92px;
+        min-height: 64px;
+        justify-content: center;
+        padding: 10px 12px;
+        text-align: center;
+    }
+
+    .menu-icon {
+        margin-right: 0 !important;
+        margin-bottom: 4px;
+    }
+
+    .menu-text {
+        font-size: 12px;
+        line-height: 1.2;
+        white-space: normal;
+    }
+
+    .sidebar-footer {
+        display: none !important;
+    }
+
+    .header-top,
+    .page-header,
+    .admin-header {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 16px 18px;
+        text-align: left;
+    }
+
+    .header-bottom {
+        padding: 14px 18px;
+    }
+
+    .dashboard-content,
+    main,
+    .container,
+    .admin-shell {
+        padding: 16px !important;
+    }
+
+    .data-entry-section,
+    .records-section,
+    .panel,
+    .editor-panel,
+    .list-panel,
+    .stock-form-container,
+    .stock-transaction-container,
+    .maintenance-form,
+    .tracking-form,
+    .selector-form {
+        padding: 18px !important;
+        border-radius: 14px !important;
+    }
+
+    .section-title,
+    .panel-header h2,
+    .page-header h1,
+    .admin-header h1 {
+        font-size: clamp(20px, 5vw, 28px);
+        line-height: 1.15;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions > *,
+    .submit-btn,
+    .reset-btn,
+    .btn-kaydet {
+        width: 100%;
+        flex: 1 1 auto;
+        font-size: 16px;
+    }
+
+    .notification,
+    .toast {
+        left: 12px !important;
+        right: 12px !important;
+        max-width: none !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-content,
+    main,
+    .container,
+    .admin-shell {
+        padding: 12px !important;
+    }
+
+    .menu-link {
+        min-width: 84px;
+    }
+
+    .form-group label {
+        font-size: 13px;
+    }
+
+    input,
+    select,
+    textarea {
+        width: 100%;
+    }
+
+    table {
+        min-width: 680px;
+    }
+}

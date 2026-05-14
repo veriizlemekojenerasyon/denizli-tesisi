@@ -51,6 +51,12 @@ function handleRequest(e) {
       case 'installHourlyMissingRecordTrigger':
         result = installHourlyMissingRecordTrigger();
         break;
+      case 'getSystemLogs':
+        result = getSystemLogs(parseInt(e.parameter.count, 10) || 100);
+        break;
+      case 'addSystemLog':
+        result = addSystemLog(e.parameter);
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -330,6 +336,15 @@ function checkHourlyMissingRecords() {
     var existing = getRecordByDateTime(tarih, saat);
     if (existing.success && existing.found) {
       props.setProperty(sentKey, new Date().toISOString());
+      addSystemLog({
+        tarih: tarih,
+        saat: saat,
+        modul: 'Saatlik Veri',
+        eksikKayit: 'Yok',
+        otomatikKayitSonucu: 'Gerekmedi',
+        mailSonucu: 'Gonderilmedi',
+        detay: 'Kayit mevcut'
+      });
       return { success: true, missing: false, added: false, message: 'Kayit mevcut' };
     }
 
@@ -356,6 +371,16 @@ function checkHourlyMissingRecords() {
 
     var mailResult = sendEmailAlert({ subject: subject, body: body });
     props.setProperty(sentKey, new Date().toISOString());
+    addSystemLog({
+      tarih: tarih,
+      saat: saat,
+      modul: 'Saatlik Veri',
+      eksikKayit: 'Saatlik kayit yok',
+      otomatikKayitSonucu: addResult.success ? 'Basarili' : 'Basarisiz',
+      mailSonucu: mailResult.success ? 'Basarili' : 'Basarisiz',
+      hataMesaji: addResult.success ? (mailResult.success ? '' : mailResult.error) : addResult.error,
+      detay: 'Otomatik bos kayit kontrolu'
+    });
 
     return {
       success: true,
@@ -364,6 +389,76 @@ function checkHourlyMissingRecords() {
       addResult: addResult,
       mail: mailResult
     };
+  } catch (error) {
+    addSystemLog({
+      modul: 'Saatlik Veri',
+      otomatikKayitSonucu: 'Hata',
+      mailSonucu: 'Bilinmiyor',
+      hataMesaji: error.toString(),
+      detay: 'checkHourlyMissingRecords'
+    });
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getOrCreateSystemLogsSheet() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getSheetByName('SistemLoglari');
+  var headers = ['Kayit Zamani', 'Tarih', 'Saat', 'Modul', 'Eksik Kayit', 'Otomatik Kayit Sonucu', 'Mail Sonucu', 'Hata Mesaji', 'Detay'];
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet('SistemLoglari');
+    sheet.appendRow(headers);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#0f172a');
+    headerRange.setFontColor('#ffffff');
+    sheet.getRange(2, 1, 1000, headers.length).setNumberFormat('@');
+  }
+  return sheet;
+}
+
+function addSystemLog(data) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    sheet.appendRow([
+      formatDateTimeTR(new Date()),
+      formatDateTR(data.tarih || data.date || ''),
+      data.saat || data.hour || '',
+      data.modul || data.module || 'Saatlik Veri',
+      data.eksikKayit || data.missing || '',
+      data.otomatikKayitSonucu || data.autoResult || '',
+      data.mailSonucu || data.mailResult || '',
+      data.hataMesaji || data.error || '',
+      data.detay || data.detail || ''
+    ]);
+    return { success: true, message: 'Sistem logu eklendi' };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getSystemLogs(count) {
+  try {
+    var sheet = getOrCreateSystemLogsSheet();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, data: [] };
+    var rowCount = Math.min(count || 100, lastRow - 1);
+    var startRow = Math.max(2, lastRow - rowCount + 1);
+    var rows = sheet.getRange(startRow, 1, rowCount, 9).getDisplayValues();
+    var data = rows.map(function(row) {
+      return {
+        kayitZamani: row[0],
+        tarih: row[1],
+        saat: row[2],
+        modul: row[3],
+        eksikKayit: row[4],
+        otomatikKayitSonucu: row[5],
+        mailSonucu: row[6],
+        hataMesaji: row[7],
+        detay: row[8]
+      };
+    }).reverse();
+    return { success: true, data: data };
   } catch (error) {
     return { success: false, error: error.toString() };
   }

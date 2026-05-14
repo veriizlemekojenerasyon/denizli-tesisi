@@ -83,6 +83,8 @@
             }).join('\n');
             alert(message || 'Bugun icin aktif vardiya duyurusu bulunmuyor.');
         });
+
+        showCriticalPopup(items);
     }
 
     function createTickerItem(text, priority = 'normal', category = 'general') {
@@ -204,6 +206,52 @@
         }
     }
 
+    function showCriticalPopup(announcements) {
+        const critical = announcements.find(item => item.priority === 'high' && !item.completed);
+        if (!critical) return;
+
+        const key = `criticalAnnouncementPopup:${critical.id || critical.title}`;
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, new Date().toISOString());
+
+        const overlay = document.createElement('div');
+        overlay.className = 'critical-announcement-overlay';
+        overlay.innerHTML = `
+            <div class="critical-announcement-modal" role="dialog" aria-modal="true">
+                <div class="critical-announcement-kicker">Kritik Duyuru</div>
+                <h2>${escapeHtml(critical.title || critical.message || 'Kritik duyuru')}</h2>
+                <p>${escapeHtml(formatTickerText(critical))}</p>
+                <div class="critical-announcement-actions">
+                    <button type="button" class="critical-btn secondary" data-action="read">Okudum</button>
+                    <button type="button" class="critical-btn primary" data-action="complete">Tamamlandi</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('[data-action="read"]').addEventListener('click', async () => {
+            await markVisibleAnnouncementsRead([critical]);
+            overlay.remove();
+        });
+
+        overlay.querySelector('[data-action="complete"]').addEventListener('click', async () => {
+            await completeAnnouncement(critical);
+            overlay.remove();
+        });
+    }
+
+    async function completeAnnouncement(item) {
+        const user = getLoggedInUser();
+        const reader = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?.email || 'Kullanici';
+        if (item.id && window.completeAnnouncementOnSheets && window.isBildirimSheetsEnabled?.()) {
+            try {
+                await window.completeAnnouncementOnSheets(item.id, reader, user?.email || '');
+            } catch (error) {
+                console.error('Duyuru tamamlandi bilgisi kaydedilemedi:', error);
+            }
+        }
+    }
+
     function getLoggedInUser() {
         try {
             return JSON.parse(localStorage.getItem('loggedInUser') || 'null');
@@ -225,6 +273,15 @@
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
 
     function ensureBildirimSheets() {
@@ -355,6 +412,72 @@
 
             .global-ticker-action:hover {
                 background: #185abc;
+            }
+
+            .critical-announcement-overlay {
+                position: fixed;
+                inset: 0;
+                z-index: 20000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 18px;
+                background: rgba(15, 23, 42, 0.62);
+            }
+
+            .critical-announcement-modal {
+                width: min(520px, 100%);
+                padding: 24px;
+                border-radius: 8px;
+                background: #ffffff;
+                border-top: 6px solid #dc2626;
+                box-shadow: 0 24px 70px rgba(15, 23, 42, 0.32);
+            }
+
+            .critical-announcement-kicker {
+                margin-bottom: 8px;
+                color: #dc2626;
+                font-size: 13px;
+                font-weight: 800;
+                text-transform: uppercase;
+            }
+
+            .critical-announcement-modal h2 {
+                margin: 0 0 10px;
+                color: #111827;
+                font-size: 24px;
+            }
+
+            .critical-announcement-modal p {
+                margin: 0 0 18px;
+                color: #334155;
+                font-size: 15px;
+                line-height: 1.5;
+            }
+
+            .critical-announcement-actions {
+                display: flex;
+                gap: 10px;
+                justify-content: flex-end;
+            }
+
+            .critical-btn {
+                min-height: 44px;
+                border: 0;
+                border-radius: 7px;
+                padding: 10px 15px;
+                font-weight: 800;
+                cursor: pointer;
+            }
+
+            .critical-btn.primary {
+                color: #ffffff;
+                background: #dc2626;
+            }
+
+            .critical-btn.secondary {
+                color: #1d4ed8;
+                background: #dbeafe;
             }
 
             @keyframes globalTickerScroll {

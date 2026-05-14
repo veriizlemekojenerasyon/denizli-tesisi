@@ -1,9 +1,9 @@
 const AdminControlConfig = {
-    saatlik: 'https://script.google.com/macros/s/AKfycbxzi0Shn7YvWSWzOv_rDiRHE6WlqiP6Tw7TDCyWC3_34AlFgB4-tzsZjn2JkRShqsd2jQ/exec',
-    motor: 'https://script.google.com/macros/s/AKfycbwqMpjWZtjczxkbS2TwOSGIkE2SS2P27t1oDRxpZpAXRl6FwSXkGGhlrj2Ccj4wDl-IXw/exec',
-    enerji: 'https://script.google.com/macros/s/AKfycbzrvkreNMp_hxgigiM-pbDXys6C127Jwx2dvqYJK8lub0BxwIFMXX4wU4vl_fKCkh-Dzg/exec',
+    saatlik: 'https://script.google.com/macros/s/AKfycbzaIRgb1ip6MwKh05rs1xYsSPjAXXQDiQYRUX-qm1cneDDoTBNG3xN27ayT8m21r5vUhg/exec',
+    motor: 'https://script.google.com/macros/s/AKfycbwb_wqukKlsGx5JdPx0eESVAfgxHvMIjUCFZneGEgIXcAf6XwSbXFGN10s0Ei54_LwSVA/exec',
+    enerji: 'https://script.google.com/macros/s/AKfycbyCPe9cugO5Njv4L52AUnttuOwTcC_FFG46QCOnLoHuXTsEtM5eULNF-TrmtvGa3ppFMA/exec',
     vardiya: 'https://script.google.com/macros/s/AKfycbxnCKSZtDelL04-ZQY3yx_ePSCK9Qy9R0WgFwtsFXj_B6HayfmwM8i_HYU-AAUETleSRA/exec',
-    bildirim: 'https://script.google.com/macros/s/AKfycbwX6YHedLGqu6N5YEajQPFqVE1eV8Zj2TK0LlexESUkzM1ISNSBPKdnEtvG58VDnhXj/exec'
+    bildirim: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec'
 };
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -58,12 +58,13 @@ async function loadDashboard() {
         buildVardiyaCheck(vardiya),
         buildBildirimCheck(bildirim)
     ];
+    const qualityChecks = buildQualityChecks(saatlik, motor, enerji);
 
     statusGrid.innerHTML = checks.map(renderStatusCard).join('');
-    checkList.innerHTML = checks.map(renderCheckItem).join('');
+    checkList.innerHTML = checks.concat(qualityChecks).map(renderCheckItem).join('');
 
     window.SystemAuditLog?.write?.('Merkezi kontrol yenilendi', `${checks.length} baslik kontrol edildi`, checks.some(item => item.level === 'danger') ? 'warn' : 'ok');
-    renderLogs();
+    await renderLogs();
 }
 
 async function fetchJson(baseUrl, params) {
@@ -111,6 +112,82 @@ function buildBildirimCheck(result) {
     return makeCheck('Duyurular', `${records.length} Aktif`, records.length ? 'Aktif duyuru yayında' : 'Aktif duyuru yok', records.length ? 'ok' : 'warn');
 }
 
+function buildQualityChecks(saatlik, motor, enerji) {
+    const saatlikIssues = analyzeSaatlikQuality(Array.isArray(saatlik.data) ? saatlik.data : []);
+    const motorIssues = analyzeMotorQuality(Array.isArray(motor.data) ? motor.data : []);
+    const enerjiIssues = analyzeEnerjiQuality(Array.isArray(enerji.data) ? enerji.data : []);
+
+    return [
+        makeCheck('Saatlik Kalite', saatlikIssues.length ? `${saatlikIssues.length} Uyari` : 'Temiz', saatlikIssues[0] || 'Son kayitlarda supheli durum yok', saatlikIssues.length ? 'warn' : 'ok'),
+        makeCheck('Motor Kalite', motorIssues.length ? `${motorIssues.length} Uyari` : 'Temiz', motorIssues[0] || 'Son motor kayitlari normal', motorIssues.length ? 'warn' : 'ok'),
+        makeCheck('Enerji Kalite', enerjiIssues.length ? `${enerjiIssues.length} Uyari` : 'Temiz', enerjiIssues[0] || 'Son enerji kayitlari normal', enerjiIssues.length ? 'warn' : 'ok')
+    ];
+}
+
+function analyzeSaatlikQuality(records) {
+    const issues = [];
+    const sorted = sortRecordsAsc(records);
+    for (let i = 1; i < sorted.length; i++) {
+        const prev = sorted[i - 1];
+        const cur = sorted[i];
+        if (toNumber(cur.aktifMwh) < toNumber(prev.aktifMwh)) {
+            issues.push(`${cur.tarih} ${cur.saat}: aktif enerji onceki kayittan dusuk`);
+            break;
+        }
+        const prev2 = sorted[i - 2];
+        if (prev2 &&
+            toNumber(prev2.aktifMwh) === toNumber(prev.aktifMwh) &&
+            toNumber(prev.aktifMwh) === toNumber(cur.aktifMwh) &&
+            toNumber(prev2.reaktifMwh) === toNumber(prev.reaktifMwh) &&
+            toNumber(prev.reaktifMwh) === toNumber(cur.reaktifMwh)) {
+            issues.push(`${cur.tarih} ${cur.saat}: ayni degerler 3 kayittir tekrar ediyor`);
+            break;
+        }
+    }
+    return issues;
+}
+
+function analyzeMotorQuality(records) {
+    const issues = [];
+    records.slice(0, 60).forEach(record => {
+        const durum = String(record.durum || '').toUpperCase();
+        const values = [
+            record.jenYatakSicaklikDE, record.jenYatakSicaklikNDE, record.sogutmaSuyuSicaklik,
+            record.yagSicaklik, record.yagBasinc, record.sarjSicaklik,
+            record.sargiSicaklik1, record.sargiSicaklik2, record.sargiSicaklik3
+        ].map(toNumber);
+        if (durum === 'NORMAL' && values.every(value => value === 0)) {
+            issues.push(`${record.tarih} ${record.saat} ${record.motor}: normal ama tum degerler sifir`);
+        }
+        if (toNumber(record.sogutmaSuyuSicaklik) > 110 || toNumber(record.yagSicaklik) > 120 || toNumber(record.yagBasinc) > 10) {
+            issues.push(`${record.tarih} ${record.saat} ${record.motor}: limit disi sicaklik/basinc`);
+        }
+    });
+    return issues.slice(0, 5);
+}
+
+function analyzeEnerjiQuality(records) {
+    const issues = [];
+    const byMotor = {};
+    sortRecordsAsc(records).forEach(record => {
+        const motor = String(record.motor || '').trim();
+        const durum = String(record.durum || '').toUpperCase();
+        if (durum === 'NORMAL') {
+            const liveValues = [record.aydemVoltaji, record.aktifGuc, record.reaktifGuc, record.ortAkim, record.ortGerilim].map(toNumber);
+            if (liveValues.every(value => value === 0)) {
+                issues.push(`${record.tarih} ${record.saat} ${motor}: normal ama enerji degerleri sifir`);
+            }
+        }
+
+        const total = toNumber(record.toplamAktifEnerji);
+        if (byMotor[motor] !== undefined && total < byMotor[motor]) {
+            issues.push(`${record.tarih} ${record.saat} ${motor}: toplam aktif enerji geriye dusmus`);
+        }
+        byMotor[motor] = total;
+    });
+    return issues.slice(0, 5);
+}
+
 function makeCheck(title, value, detail, level) {
     return { title, value, detail, level };
 }
@@ -145,31 +222,58 @@ function loadingCard() {
         </article>`;
 }
 
-function renderLogs() {
+async function renderLogs() {
     const body = document.getElementById('logTableBody');
-    const logs = window.SystemAuditLog?.read?.() || [];
+    const localLogs = window.SystemAuditLog?.read?.() || [];
+    const remoteLogs = await fetchAllSystemLogs();
+    const logs = remoteLogs.concat(localLogs.map(log => ({
+        kayitZamani: log.at,
+        modul: log.page,
+        tarih: '',
+        saat: '',
+        eksikKayit: log.action,
+        otomatikKayitSonucu: log.status,
+        mailSonucu: '-',
+        hataMesaji: '',
+        detay: log.detail
+    })));
     if (!logs.length) {
-        body.innerHTML = '<tr><td colspan="6" class="empty">Henüz log yok.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6" class="empty">Henuz log yok.</td></tr>';
         return;
     }
 
     body.innerHTML = logs.slice(0, 80).map(log => `
         <tr>
-            <td>${escapeHtml(log.at)}</td>
-            <td>${escapeHtml(log.user)}</td>
-            <td>${escapeHtml(log.page)}</td>
-            <td>${escapeHtml(log.action)}</td>
-            <td>${escapeHtml(log.detail)}</td>
-            <td><span class="badge ${log.status || 'ok'}">${escapeHtml(log.status || 'info')}</span></td>
+            <td>${escapeHtml(log.kayitZamani || log.at)}</td>
+            <td>${escapeHtml(log.modul || log.page || '-')}</td>
+            <td>${escapeHtml(`${log.tarih || ''} ${log.saat || ''}`.trim() || '-')}</td>
+            <td>${escapeHtml(log.eksikKayit || log.action || '-')}</td>
+            <td>${escapeHtml(log.detay || log.detail || log.hataMesaji || '-')}</td>
+            <td><span class="badge ${getLogBadgeLevel(log)}">${escapeHtml(log.otomatikKayitSonucu || log.status || 'info')}</span></td>
         </tr>`).join('');
 }
-
 function clearLogs() {
     if (!confirm('Sistem logları temizlensin mi?')) return;
     window.SystemAuditLog?.clear?.();
     renderLogs();
 }
 
+async function fetchAllSystemLogs() {
+    const results = await Promise.all([
+        fetchJson(AdminControlConfig.saatlik, { action: 'getSystemLogs', count: '30' }),
+        fetchJson(AdminControlConfig.motor, { action: 'getSystemLogs', count: '30' }),
+        fetchJson(AdminControlConfig.enerji, { action: 'getSystemLogs', count: '30' }),
+        fetchJson(AdminControlConfig.bildirim, { action: 'getSystemLogs', count: '30' })
+    ]);
+    return results.flatMap(result => result.success && Array.isArray(result.data) ? result.data : []);
+}
+
+function getLogBadgeLevel(log) {
+    const text = `${log.otomatikKayitSonucu || ''} ${log.mailSonucu || ''} ${log.hataMesaji || ''}`.toLowerCase();
+    if (text.includes('hata') || text.includes('basarisiz')) return 'danger';
+    if (text.includes('gerekmedi') || text.includes('basarili') || text.includes('ok')) return 'ok';
+    return 'warn';
+}
 function getExpectedSlot() {
     const now = new Date();
     if (now.getMinutes() < 55) {
@@ -188,6 +292,28 @@ function matchesDate(value, trDate) {
     return String(value || '').includes(trDate) || String(value || '').startsWith(isoDate);
 }
 
+function sortRecordsAsc(records) {
+    return [...records].sort((a, b) => recordTime(a) - recordTime(b));
+}
+
+function recordTime(record) {
+    const date = normalizeDateForParse(record.tarih);
+    const hour = String(record.saat || '00:00').split(':')[0] || '0';
+    return new Date(`${date}T${String(hour).padStart(2, '0')}:00:00`).getTime() || 0;
+}
+
+function normalizeDateForParse(value) {
+    const text = String(value || '').trim();
+    if (text.includes('-')) return text.slice(0, 10);
+    const parts = text.split('.');
+    return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : '1970-01-01';
+}
+
+function toNumber(value) {
+    const normalized = String(value ?? '').replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
 function getCurrentUser() {
     try {
         return JSON.parse(localStorage.getItem('loggedInUser') || 'null');
