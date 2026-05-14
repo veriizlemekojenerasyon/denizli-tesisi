@@ -109,6 +109,26 @@ function normalizeDateTR(tarih) {
   return value;
 }
 
+function normalizeEnerjiDurum(durum) {
+  var value = String(durum || 'NORMAL').trim();
+  if (!value) return 'NORMAL';
+
+  var upper = value.toUpperCase()
+    .replace(/\u00C7/g, 'C')
+    .replace(/\u011E/g, 'G')
+    .replace(/\u0130/g, 'I')
+    .replace(/\u0049\u0307/g, 'I')
+    .replace(/\u00D6/g, 'O')
+    .replace(/\u015E/g, 'S')
+    .replace(/\u00DC/g, 'U');
+
+  if (upper.indexOf('MOTOR') !== -1 && upper.indexOf('NORMAL') === -1) {
+    return 'MOTOR ÇALIŞMIYOR';
+  }
+
+  return value;
+}
+
 function getEnerjiSheetIfExists(motor) {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Enerji GM-' + motor);
 }
@@ -239,18 +259,19 @@ function addRecord(data) {
     var kayitTarihi = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm:ss');
     
     // Verileri al (Motor çalışmıyor durumu kontrolü)
-    var durum = data.durum || 'NORMAL';
+    var durum = normalizeEnerjiDurum(data.durum || 'NORMAL');
     var kaydeden = data.kaydeden || 'Admin';
     
     // Eğer motor çalışmıyorsa, M, N, O sütunları için son değerleri kullan, diğerlerini 0 olarak kaydet
     var values;
     if (durum === 'MOTOR ÇALIŞMIYOR') {
+      var zeroValue = parseEnerjiNumber('0.00');
       values = [
         tarihObj, data.vardiya, data.saat, data.motor,
-        0, 0, 0, 0, 0, 0, 0, 0, // Diğer değerler 0 (8 tane)
-        parseFloat(data.toplamAktifEnerji.toString().replace(',', '.')) || 0, // M sütunu - son değer
-        parseFloat(data.calismaSaati.toString().replace(',', '.')) || 0,     // N sütunu - son değer
-        parseFloat(data.kalkisSayisi.toString().replace(',', '.')) || 0,      // O sütunu - son değer
+        zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, // Diğer değerler 0.00 (8 tane)
+        parseEnerjiNumber(data.toplamAktifEnerji), // M sütunu - son değer
+        parseEnerjiNumber(data.calismaSaati),      // N sütunu - son değer
+        parseEnerjiNumber(data.kalkisSayisi),      // O sütunu - son değer
         durum, kaydeden, kayitTarihi
       ];
     } else {
@@ -825,16 +846,17 @@ function addMultipleRecords(dataString) {
         rowData[12] = parseEnerjiNumber(record.toplamAktifEnerji);
         rowData[13] = parseEnerjiNumber(record.calismaSaati);
         rowData[14] = parseEnerjiNumber(record.kalkisSayisi);
-        rowData[15] = record.durum || 'MOTOR ÇALIŞMIYOR';
+        rowData[15] = normalizeEnerjiDurum(record.durum || 'MOTOR ÇALIŞMIYOR');
         if (rowData[15] !== 'NORMAL') {
-          rowData[4] = 0;
-          rowData[5] = 0;
-          rowData[6] = 0;
-          rowData[7] = 0;
-          rowData[8] = 0;
-          rowData[9] = 0;
-          rowData[10] = 0;
-          rowData[11] = 0;
+          var zeroValue = parseEnerjiNumber('0.00');
+          rowData[4] = zeroValue;
+          rowData[5] = zeroValue;
+          rowData[6] = zeroValue;
+          rowData[7] = zeroValue;
+          rowData[8] = zeroValue;
+          rowData[9] = zeroValue;
+          rowData[10] = zeroValue;
+          rowData[11] = zeroValue;
         }
         
         // Satırı ekle
