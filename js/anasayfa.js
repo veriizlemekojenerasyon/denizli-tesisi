@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Buhar verisi config
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxnhHSmc5GTuOq8hdqgFM2-FA2XNjRdLHoED5gmjXbmWcYycPNXykdd0ZYTzOI3HNJxKg/exec';
-    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwOaZM8EVOVY1iE-AF1HDY-Eh6LFWUdv0Y2aVJwbys1xEv-HoYofSiVMiorZUInMXQIQA/exec';
+    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwM-Ulgf4QuvdZ_jnl5Po4qUecOZ5VJaWpazXzUSGFvOLDtG7-lyHwLuHOq1Bk2mTahyQ/exec';
     const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz33FlBicqkZdRw5UOdagkiZK3leF18QuVPETLK_HGysSYbDAxigev0o_UUnYxuHAr-JA/exec';
     const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyimCmn6QQy0hl__KEqcLl_xd0rLjW9S-tS7vWU-nqwepH2Ur4tCDbzMvBafuSLrhQkEw/exec';
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
