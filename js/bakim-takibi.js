@@ -1,5 +1,5 @@
 // Bakım Takibi JavaScript - ÇALIŞAN VERSİYON
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyimCmn6QQy0hl__KEqcLl_xd0rLjW9S-tS7vWU-nqwepH2Ur4tCDbzMvBafuSLrhQkEw/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzPyZrQ77uxqfy1SR32dWUqy4EymmhrtW7deH6g81L9AA76JUYfZNvmUbRHbViv2m2v/exec";
 
 // Sistem başlatma fonksiyonu
 async function initializeSystem() {
@@ -1021,6 +1021,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Istatistikler otomatik yukleniyor...');
         maintenanceStats.loadStats();
     }, 1000);
+
+    setTimeout(() => {
+        loadActiveRecords();
+    }, 1500);
     
     // Bakim hatiraticilarini kontrol et
     setTimeout(() => {
@@ -1139,9 +1143,38 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
-    initCompanySelect('periodic-technician-company', 'periodic-technician', 'periodic-external-company');
-    initCompanySelect('normal-technician-company', 'normal-technician', 'normal-external-company');
-    initCompanySelect('fault-technician-company', 'fault-technician', 'fault-external-company');
+    function initCompanySelectV2(companyId, technicianId, externalId) {
+        const companySelect = document.getElementById(companyId);
+        const technicianSelect = document.getElementById(technicianId);
+        const externalSelect = document.getElementById(externalId);
+        if (!companySelect || !technicianSelect || !externalSelect) return;
+
+        function applyCompanyMode() {
+            if (!companySelect.value) companySelect.value = 'internal';
+
+            if (companySelect.value === 'external') {
+                technicianSelect.style.display = 'none';
+                technicianSelect.required = false;
+                technicianSelect.value = '';
+                externalSelect.style.display = 'block';
+                externalSelect.required = true;
+                return;
+            }
+
+            technicianSelect.style.display = 'block';
+            technicianSelect.required = true;
+            externalSelect.style.display = 'none';
+            externalSelect.required = false;
+            externalSelect.value = '';
+        }
+
+        applyCompanyMode();
+        companySelect.addEventListener('change', applyCompanyMode);
+    }
+
+    initCompanySelectV2('periodic-technician-company', 'periodic-technician', 'periodic-external-company');
+    initCompanySelectV2('normal-technician-company', 'normal-technician', 'normal-external-company');
+    initCompanySelectV2('fault-technician-company', 'fault-technician', 'fault-external-company');
 
     // Dosya yükleme alanları
     function initFileUpload(areaId, inputId, listId) {
@@ -1256,6 +1289,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Bakım Hatırlatıcı Fonksiyonları
 function checkMaintenanceReminders() {
+    return;
+
     const reminders = [
         {
             title: 'GM-1 2000 Saat Bakımı',
@@ -1667,11 +1702,32 @@ async function loadActiveRecords() {
     }
 }
 
+function calculateOverdueMaintenanceCount(records) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return (records || []).filter(record => {
+        const parts = String(record.date || '').split('.');
+        if (parts.length !== 3) return false;
+
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+
+        const recordDate = new Date(year, month, day);
+        recordDate.setHours(0, 0, 0, 0);
+        return recordDate < today;
+    }).length;
+}
+
 function displayActiveRecords(records) {
     const tbody = document.getElementById('active-records-tbody');
     if (!tbody) return;
     
     tbody.innerHTML = '';
+    const overdueEl = document.getElementById('overdue-maintenance');
+    if (overdueEl) overdueEl.textContent = calculateOverdueMaintenanceCount(records);
     
     if (records.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 20px; color: #666;">Aktif kayıt bulunmamaktadır</td></tr>';
@@ -1754,6 +1810,11 @@ async function checkOilSamples() {
 }
 
 // Yağ numune ve alternatör gresleme bildirimlerini göster
+function formatMaintenanceRemaining(remainingHours) {
+    const value = parseInt(remainingHours, 10) || 0;
+    return value > 0 ? `Kalan: ${value} saat` : 'Bakim zamani geldi';
+}
+
 function displayOilSampleNotifications(motors) {
     const oilAlerts = [];
     const oilWarnings = [];
@@ -1765,13 +1826,13 @@ function displayOilSampleNotifications(motors) {
         if (motor.needsOilSample) {
             oilAlerts.push({
                 motor: motor.motor,
-                message: `${motor.motor} için YAĞ NUMUNE alma zamanı geldi! Kalan: ${motor.remainingOilHours} saat`,
+                message: `${motor.motor} için YAĞ NUMUNE alma zamanı geldi! ${formatMaintenanceRemaining(motor.remainingOilHours)}`,
                 type: 'urgent'
             });
-        } else if (motor.remainingOilHours <= 100) {
+        } else if (motor.warnsOilSample || motor.remainingOilHours <= 100) {
             oilWarnings.push({
                 motor: motor.motor,
-                message: `${motor.motor} için yağ numune alma yaklaşıyor. Kalan: ${motor.remainingOilHours} saat`,
+                message: `${motor.motor} için yağ numune alma yaklaşıyor. ${formatMaintenanceRemaining(motor.remainingOilHours)}`,
                 type: 'warning'
             });
         }
@@ -1780,13 +1841,13 @@ function displayOilSampleNotifications(motors) {
         if (motor.needsAlternatorGrease) {
             altAlerts.push({
                 motor: motor.motor,
-                message: `${motor.motor} için ALTERNATÖR GRESLEME zamanı geldi! Kalan: ${motor.remainingAltHours} saat`,
+                message: `${motor.motor} için ALTERNATÖR GRESLEME zamanı geldi! ${formatMaintenanceRemaining(motor.remainingAltHours)}`,
                 type: 'urgent'
             });
-        } else if (motor.remainingAltHours <= 200) {
+        } else if (motor.warnsAlternatorGrease || motor.remainingAltHours <= 100) {
             altWarnings.push({
                 motor: motor.motor,
-                message: `${motor.motor} için alternatör gresleme yaklaşıyor. Kalan: ${motor.remainingAltHours} saat`,
+                message: `${motor.motor} için alternatör gresleme yaklaşıyor. ${formatMaintenanceRemaining(motor.remainingAltHours)}`,
                 type: 'warning'
             });
         }

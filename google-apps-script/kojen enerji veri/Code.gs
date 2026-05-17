@@ -201,6 +201,56 @@ function mapEnerjiRow(row) {
   };
 }
 
+function getLastEnerjiCountersBefore(sheet, tarih, saat) {
+  var fallback = {
+    toplamAktifEnerji: 0,
+    calismaSaati: 0,
+    kalkisSayisi: 0
+  };
+
+  try {
+    if (!sheet || sheet.getLastRow() < 2) {
+      return fallback;
+    }
+
+    var targetTime = parseDateTimeTR(tarih, saat).getTime();
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getDisplayValues();
+    var bestRecord = null;
+    var bestTime = -Infinity;
+
+    for (var i = 0; i < rows.length; i++) {
+      var record = mapEnerjiRow(rows[i]);
+      var recordTime = parseDateTimeTR(record.tarih, record.saat).getTime();
+      if (isNaN(recordTime) || recordTime >= targetTime || recordTime < bestTime) {
+        continue;
+      }
+
+      var energy = parseEnerjiNumber(record.toplamAktifEnerji);
+      var hours = parseEnerjiNumber(record.calismaSaati);
+      var starts = parseEnerjiNumber(record.kalkisSayisi);
+      if (energy > 0 || hours > 0 || starts > 0) {
+        bestTime = recordTime;
+        bestRecord = {
+          toplamAktifEnerji: energy,
+          calismaSaati: hours,
+          kalkisSayisi: starts
+        };
+      }
+    }
+
+    return bestRecord || fallback;
+  } catch (error) {
+    Logger.log('Son enerji sayaclari alinamadi: ' + error.toString());
+    return fallback;
+  }
+}
+
+function getCounterOrLatest(value, latestValue) {
+  var parsed = parseEnerjiNumber(value);
+  var latest = parseEnerjiNumber(latestValue);
+  return parsed > 0 ? parsed : latest;
+}
+
 // 🔥 MOTOR BAZLI SAYFA GETİRME FONKSİYONU
 function getOrCreateSheet(motor) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -311,12 +361,17 @@ function addRecord(data) {
     var values;
     if (durum === 'MOTOR ÇALIŞMIYOR') {
       var zeroValue = parseEnerjiNumber('0.00');
+      var latestCounters = getLastEnerjiCountersBefore(sheet, formattedTarih, data.saat);
+      var toplamAktifEnerji = getCounterOrLatest(data.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
+      var calismaSaati = getCounterOrLatest(data.calismaSaati, latestCounters.calismaSaati);
+      var kalkisSayisi = getCounterOrLatest(data.kalkisSayisi, latestCounters.kalkisSayisi);
+
       values = [
         tarihObj, data.vardiya, data.saat, data.motor,
         zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, // Diğer değerler 0.00 (8 tane)
-        parseEnerjiNumber(data.toplamAktifEnerji), // M sütunu - son değer
-        parseEnerjiNumber(data.calismaSaati),      // N sütunu - son değer
-        parseEnerjiNumber(data.kalkisSayisi),      // O sütunu - son değer
+        toplamAktifEnerji, // M sütunu - son değer
+        calismaSaati,      // N sütunu - son değer
+        kalkisSayisi,      // O sütunu - son değer
         durum, kaydeden, kayitTarihi
       ];
     } else {
@@ -643,9 +698,9 @@ function getDashboardSummary(tarih) {
 
 function createEmptyDashboardMotors() {
   return {
-    gm1: { totalProduction: 0, totalHours: 0, status: 'stopped' },
-    gm2: { totalProduction: 0, totalHours: 0, status: 'stopped' },
-    gm3: { totalProduction: 0, totalHours: 0, status: 'stopped' }
+    gm1: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' },
+    gm2: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' },
+    gm3: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' }
   };
 }
 
@@ -713,14 +768,32 @@ function isDashboardFaultType(value) {
 
 function applyLatestEnergyToDashboard(motorData, records) {
   var seen = {};
+  var recordsByMotor = {};
+
+  for (var groupIndex = 0; groupIndex < records.length; groupIndex++) {
+    var groupRecord = records[groupIndex];
+    var groupKey = getDashboardMotorKey(groupRecord.motor);
+    if (!motorData[groupKey]) continue;
+    if (!recordsByMotor[groupKey]) recordsByMotor[groupKey] = [];
+    recordsByMotor[groupKey].push(groupRecord);
+  }
+
   for (var i = 0; i < records.length; i++) {
     var record = records[i];
     var key = getDashboardMotorKey(record.motor);
     if (!motorData[key] || seen[key]) continue;
     seen[key] = true;
 
-    motorData[key].totalProduction = parseEnerjiNumber(record.toplamAktifEnerji) / 1000;
-    motorData[key].totalHours = parseEnerjiNumber(record.calismaSaati);
+    var totalEnergy = parseEnerjiNumber(record.toplamAktifEnerji);
+    var totalHours = parseEnerjiNumber(record.calismaSaati);
+    var previousRecord = recordsByMotor[key] && recordsByMotor[key].length > 1 ? recordsByMotor[key][1] : null;
+    var previousEnergy = previousRecord ? parseEnerjiNumber(previousRecord.toplamAktifEnerji) : totalEnergy;
+    var previousHours = previousRecord ? parseEnerjiNumber(previousRecord.calismaSaati) : totalHours;
+
+    motorData[key].totalProduction = totalEnergy / 1000;
+    motorData[key].hourlyProduction = Math.max(0, (totalEnergy - previousEnergy) / 1000);
+    motorData[key].totalHours = totalHours;
+    motorData[key].hourlyHours = Math.max(0, totalHours - previousHours);
     if (isDashboardStoppedStatus(record.durum)) {
       motorData[key].status = 'stopped';
     }
@@ -762,11 +835,10 @@ function fetchDashboardExternalData() {
   var urls = {
     motor: 'https://script.google.com/macros/s/AKfycbzqMKhkZXsKyywOZ3D-Ks3xzLz4HxBeR6vkLUdD57nfgcgf5NJleuAt24uv1-1Av7-jHQ/exec?action=getLastRecords&count=100',
     buhar: 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec?action=getLastRecords&count=1',
-    maintenance: 'https://script.google.com/macros/s/AKfycbyimCmn6QQy0hl__KEqcLl_xd0rLjW9S-tS7vWU-nqwepH2Ur4tCDbzMvBafuSLrhQkEw/exec?action=getActiveRecords',
     announcements: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec?action=getAnnouncements&active=true'
   };
 
-  var keys = ['motor', 'buhar', 'maintenance', 'announcements'];
+  var keys = ['motor', 'buhar', 'announcements'];
   var requests = keys.map(function(key) {
     return {
       url: urls[key],
@@ -802,7 +874,6 @@ function fetchDashboardExternalData() {
 
       if (key === 'motor') output.motorRecords = payload.data || [];
       if (key === 'buhar') output.buharRecords = payload.data || [];
-      if (key === 'maintenance') output.maintenanceRecords = payload.records || [];
       if (key === 'announcements') output.announcements = payload.data || [];
     }
   } catch (error) {
@@ -1844,6 +1915,7 @@ function addMultipleRecords(dataString) {
         rowData[15] = normalizeEnerjiDurum(record.durum || 'MOTOR ÇALIŞMIYOR');
         if (rowData[15] !== 'NORMAL') {
           var zeroValue = parseEnerjiNumber('0.00');
+          var latestCounters = getLastEnerjiCountersBefore(sheet, tarih, record.saat);
           rowData[4] = zeroValue;
           rowData[5] = zeroValue;
           rowData[6] = zeroValue;
@@ -1852,6 +1924,9 @@ function addMultipleRecords(dataString) {
           rowData[9] = zeroValue;
           rowData[10] = zeroValue;
           rowData[11] = zeroValue;
+          rowData[12] = getCounterOrLatest(record.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
+          rowData[13] = getCounterOrLatest(record.calismaSaati, latestCounters.calismaSaati);
+          rowData[14] = getCounterOrLatest(record.kalkisSayisi, latestCounters.kalkisSayisi);
         }
         
         // Satırı ekle

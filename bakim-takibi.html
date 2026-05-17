@@ -175,6 +175,13 @@
                                     <div class="stat-label">Aktif Teknisyen</div>
                                 </div>
                             </div>
+                            <div class="stat-card stat-card-overdue">
+                                <div class="stat-icon">!</div>
+                                <div class="stat-content">
+                                    <div class="stat-number" id="overdue-maintenance">0</div>
+                                    <div class="stat-label">Geciken Is</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -229,7 +236,7 @@
                         <div class="maintenance-container">
                     <!-- Form Seçimi -->
                     <div class="form-selector">
-                        <h2>Bakım Türü Seçimi</h2>
+                        <h2>Yeni İş Emri</h2>
                         <div class="form-buttons">
                             <button type="button" class="form-btn active" data-form="periodic">🔄 Periyodik Bakım</button>
                             <button type="button" class="form-btn" data-form="normal">🔧 Normal Bakım</button>
@@ -269,7 +276,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="periodic-technician">Teknisyen</label>
+                                    <label for="periodic-technician-company">Firma / Teknisyen</label>
                                     <div class="technician-input-group">
                                         <select id="periodic-technician" name="technician" required>
                                             <option value="">Teknisyen seçin...</option>
@@ -279,14 +286,13 @@
                                             <option value="altan-hunoglu">Altan Hunoğlu</option>
                                         </select>
                                         <select id="periodic-technician-company" name="technician-company">
-                                            <option value="">Firma seçin...</option>
-                                            <option value="internal">İç Destek</option>
+                                            <option value="internal" selected>İç Destek</option>
                                             <option value="external">Dış Destek</option>
                                         </select>
                                         <select id="periodic-external-company" name="periodic-external-company" style="display: none;">
-                                            <option value="">Firma seçin...</option>
-                                            <option value="topkapi">Topkapı</option>
-                                            <option value="other">Diğer</option>
+                                            <option value="">Dış firma seçin...</option>
+                                            <option value="topkapi">Topkapı Endüstri</option>
+                                            <option value="other">Diğer Dış Firma</option>
                                         </select>
                                     </div>
                                 </div>
@@ -355,7 +361,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label for="normal-technician">Teknisyen</label>
+                                    <label for="normal-technician-company">Firma / Teknisyen</label>
                                     <div class="technician-input-group">
                                         <select id="normal-technician" name="technician" required>
                                             <option value="">Teknisyen seçin...</option>
@@ -365,14 +371,13 @@
                                             <option value="altan-hunoglu">Altan Hunoğlu</option>
                                         </select>
                                         <select id="normal-technician-company" name="technician-company">
-                                            <option value="">Firma seçin...</option>
-                                            <option value="internal">İç Destek</option>
+                                            <option value="internal" selected>İç Destek</option>
                                             <option value="external">Dış Destek</option>
                                         </select>
                                         <select id="normal-external-company" name="normal-external-company" style="display: none;">
-                                            <option value="">Firma seçin...</option>
-                                            <option value="topkapi">Topkapı</option>
-                                            <option value="other">Diğer</option>
+                                            <option value="">Dış firma seçin...</option>
+                                            <option value="topkapi">Topkapı Endüstri</option>
+                                            <option value="other">Diğer Dış Firma</option>
                                         </select>
                                     </div>
                                 </div>
@@ -496,7 +501,7 @@
                                 </div>
                             </div>
                             <div class="form-group full-width">
-                                <label for="fault-technician">Teknisyen</label>
+                                <label for="fault-technician-company">Firma / Teknisyen</label>
                                 <div class="technician-input-group">
                                     <select id="fault-technician" name="technician" required>
                                         <option value="">Teknisyen seçin...</option>
@@ -506,14 +511,13 @@
                                         <option value="altan-hunoglu">Altan Hunoğlu</option>
                                     </select>
                                     <select id="fault-technician-company" name="technician-company">
-                                        <option value="">Firma seçin...</option>
-                                        <option value="internal">İç Destek</option>
+                                        <option value="internal" selected>İç Destek</option>
                                         <option value="external">Dış Destek</option>
                                     </select>
                                     <select id="fault-external-company" name="fault-external-company" style="display: none;">
-                                        <option value="">Firma seçin...</option>
-                                        <option value="topkapi">Topkapı</option>
-                                        <option value="other">Diğer</option>
+                                        <option value="">Dış firma seçin...</option>
+                                        <option value="topkapi">Topkapı Endüstri</option>
+                                        <option value="other">Diğer Dış Firma</option>
                                     </select>
                                 </div>
                             </div>
@@ -574,7 +578,7 @@
                     <div class="reports-section">
                         <!-- Raporlama Paneli -->
                         <div class="report-panel">
-                            <h2>📊 Bakım Raporları</h2>
+                            <h2>Bakım Geçmişi / Raporlar</h2>
                             <div class="report-controls">
                                 <div class="control-group">
                                     <label for="report-motor">Motor:</label>
@@ -664,8 +668,8 @@
                                 
                                 <!-- Aktif Kayıtlar Yönetim Paneli -->
                                 <div class="active-records-panel" style="margin-top: 30px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-                                    <h3>🔧 Aktif Kayıtlar (Kapatma)</h3>
-                                    <p style="color: #666; margin-bottom: 15px; font-size: 0.9rem;">Aktif bakım/ariza kayıtlarını görüntüleyin ve kapatabilirsiniz.</p>
+                                    <h3>Aktif İş Emirleri</h3>
+                                    <p style="color: #666; margin-bottom: 15px; font-size: 0.9rem;">Açık bakım ve arıza işlerini takip edin, tamamlanan kayıtları kapatın.</p>
                                     
                                     <div class="active-records-controls" style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
                                         <select id="active-filter-motor" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">

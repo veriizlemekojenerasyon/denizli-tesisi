@@ -6,17 +6,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const motorData = {
         gm1: {
             totalProduction: 0,
+            hourlyProduction: 0,
             totalHours: 0,
+            hourlyHours: 0,
             status: 'stopped'
         },
         gm2: {
             totalProduction: 0,
+            hourlyProduction: 0,
             totalHours: 0,
+            hourlyHours: 0,
             status: 'stopped'
         },
         gm3: {
             totalProduction: 0,
+            hourlyProduction: 0,
             totalHours: 0,
+            hourlyHours: 0,
             status: 'stopped'
         }
     };
@@ -31,9 +37,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Buhar verisi config
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec';
-    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxWFpI3J4TLm0WTccaT0pNYe9TUZdn6I4to1R-GaAQuXSKHzMr3FW43m5e0BjDUEKb72Q/exec';
+    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyZriErX9t75eevT-2FWlVFCF_3JCDQ-f26EONhvge8anXrDnr0iTkzhM1QhUUWQcLwYA/exec';
     const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqMKhkZXsKyywOZ3D-Ks3xzLz4HxBeR6vkLUdD57nfgcgf5NJleuAt24uv1-1Av7-jHQ/exec';
-    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyimCmn6QQy0hl__KEqcLl_xd0rLjW9S-tS7vWU-nqwepH2Ur4tCDbzMvBafuSLrhQkEw/exec';
+    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPyZrQ77uxqfy1SR32dWUqy4EymmhrtW7deH6g81L9AA76JUYfZNvmUbRHbViv2m2v/exec';
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
     const defaultAnnouncements = [
         {
@@ -57,14 +63,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadDashboardData() {
         const dashboardLoaded = await loadDashboardSummary();
+        await updateAnnouncementTicker();
+        await loadLatestEnergyData();
+        await loadLatestMotorStatus();
+        await loadMaintenanceData();
         if (!dashboardLoaded) {
-            await updateAnnouncementTicker();
-            await loadLatestEnergyData();
-            await loadLatestMotorStatus();
             await loadBuharData();
-            await loadMaintenanceData();
-        } else {
-            await updateAnnouncementTicker();
         }
         updateMotorData();
         updateSummaryData();
@@ -131,7 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 Object.entries(result.motors).forEach(([key, data]) => {
                     if (!motorData[key]) return;
                     motorData[key].totalProduction = parseDashboardNumber(data.totalProduction);
+                    motorData[key].hourlyProduction = parseDashboardNumber(data.hourlyProduction);
                     motorData[key].totalHours = parseDashboardNumber(data.totalHours);
+                    motorData[key].hourlyHours = parseDashboardNumber(data.hourlyHours);
                     motorData[key].status = data.status === 'running' ? 'running' : 'stopped';
                 });
             }
@@ -277,10 +283,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 animateValue(totalProductionEl, 0, data.totalProduction, 1500, ' MWh');
             }
 
+            const hourlyProductionEl = document.getElementById(`${motorId}-hourly-production`);
+            if (hourlyProductionEl) {
+                animateValue(hourlyProductionEl, 0, data.hourlyProduction || 0, 1500, ' MWh');
+            }
+
             // Toplam çalışma
             const totalHoursEl = document.getElementById(`${motorId}-total-hours`);
             if (totalHoursEl) {
                 animateValue(totalHoursEl, 0, data.totalHours, 1500, ' saat');
+            }
+
+            const hourlyHoursEl = document.getElementById(`${motorId}-hourly-hours`);
+            if (hourlyHoursEl) {
+                animateValue(hourlyHoursEl, 0, data.hourlyHours || 0, 1500, ' saat');
             }
 
             // Motor durumunu güncelle
@@ -428,18 +444,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const latestByMotor = {};
+            const recordsByMotor = {};
             result.data.forEach(record => {
                 const key = getMotorKey(record.motor);
-                if (!motorData[key] || latestByMotor[key]) return;
-                latestByMotor[key] = record;
+                if (!motorData[key]) return;
+                if (!recordsByMotor[key]) recordsByMotor[key] = [];
+                recordsByMotor[key].push(record);
+                if (!latestByMotor[key]) latestByMotor[key] = record;
             });
 
             Object.entries(latestByMotor).forEach(([key, record]) => {
                 const totalEnergyKwh = parseDashboardNumber(record.toplamAktifEnerji);
                 const totalHours = parseDashboardNumber(record.calismaSaati);
+                const previousRecord = recordsByMotor[key] && recordsByMotor[key][1] ? recordsByMotor[key][1] : null;
+                const previousEnergyKwh = previousRecord ? parseDashboardNumber(previousRecord.toplamAktifEnerji) : totalEnergyKwh;
+                const previousHours = previousRecord ? parseDashboardNumber(previousRecord.calismaSaati) : totalHours;
 
                 motorData[key].totalProduction = totalEnergyKwh / 1000;
+                motorData[key].hourlyProduction = Math.max(0, (totalEnergyKwh - previousEnergyKwh) / 1000);
                 motorData[key].totalHours = totalHours;
+                motorData[key].hourlyHours = Math.max(0, totalHours - previousHours);
 
                 if (isStoppedMotorStatus(record.durum)) {
                     motorData[key].status = 'stopped';

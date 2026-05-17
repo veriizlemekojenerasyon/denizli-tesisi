@@ -1133,6 +1133,7 @@ body {
     display: flex;
     gap: 10px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .technician-input-group select {
@@ -1145,16 +1146,26 @@ body {
     min-width: 180px;
 }
 
+.technician-input-group select[name="technician-company"] {
+    flex: 0.8;
+    border-color: #94a3b8;
+    background: #f8fafc;
+    font-weight: 600;
+}
+
 .technician-input-group select:first-child {
+    order: 2;
     min-width: 220px;
 }
 
 .technician-input-group select:nth-child(2) {
-    min-width: 120px;
+    order: 1;
+    min-width: 150px;
 }
 
 .technician-input-group select:nth-child(3) {
-    min-width: 150px;
+    order: 3;
+    min-width: 190px;
 }
 
 .technician-input-group select:focus {
@@ -2011,3 +2022,341 @@ body {
     }
 }
 
+/* Bakim takip operasyon duzeni */
+.dashboard-content {
+    background: #f6f7f9;
+    padding: 18px;
+}
+
+.top-dashboard-row {
+    display: block;
+    margin-bottom: 18px;
+}
+
+.chart-panel {
+    display: none;
+}
+
+.stats-panel,
+.maintenance-container,
+.report-panel,
+.active-records-panel,
+.report-summary,
+.report-table-container {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+.stats-panel,
+.maintenance-container,
+.report-panel {
+    padding: 18px !important;
+}
+
+.stats-panel h2,
+.form-selector h2,
+.report-panel h2,
+.maintenance-form h3,
+.active-records-panel h3,
+.report-table-container h3,
+.report-summary h3 {
+    color: #111827 !important;
+    letter-spacing: 0;
+}
+
+.stats-grid {
+    grid-template-columns: repeat(5, minmax(130px, 1fr));
+    gap: 12px;
+}
+
+.stat-card {
+    min-height: 82px;
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #64748b;
+    border-radius: 8px;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.stat-card:hover {
+    transform: none !important;
+    box-shadow: none !important;
+    border-color: #cbd5e1;
+}
+
+.stat-card:nth-child(1) {
+    border-left-color: #475569;
+}
+
+.stat-card:nth-child(2) {
+    border-left-color: #2563eb;
+}
+
+.stat-card:nth-child(3) {
+    border-left-color: #dc2626;
+}
+
+.stat-card:nth-child(4) {
+    border-left-color: #16a34a;
+}
+
+.stat-card-overdue {
+    border-left-color: #f59e0b !important;
+}
+
+.stat-icon {
+    width: 34px;
+    height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 6px;
+    color: #334155;
+    font-size: 1rem;
+}
+
+.stat-number {
+    color: #111827;
+    font-size: 1.45rem;
+}
+
+.stat-label {
+    color: #64748b;
+    font-size: 0.82rem;
+    opacity: 1;
+}
+
+.main-content-area {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.9fr) minmax(520px, 1.4fr);
+    gap: 18px;
+    align-items: start;
+}
+
+.forms-section,
+.reports-section {
+    min-height: 0;
+}
+
+.form-selector {
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 14px;
+    margin-bottom: 16px;
+}
+
+.form-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.form-btn,
+.btn,
+.report-controls button,
+.table-controls button,
+.active-records-controls button,
+#active-records-table button {
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    font-weight: 600 !important;
+}
+
+.form-btn {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #374151 !important;
+    padding: 10px 8px !important;
+}
+
+.form-btn.active {
+    background: #111827 !important;
+    border-color: #111827 !important;
+    color: #ffffff !important;
+}
+
+.maintenance-form {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.maintenance-form-content {
+    display: grid;
+    gap: 12px;
+}
+
+.form-row {
+    gap: 12px;
+}
+
+.form-group label,
+.control-group label {
+    color: #374151;
+    font-weight: 600;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+.control-group select,
+.table-controls input,
+.active-records-controls select {
+    border: 1px solid #d1d5db !important;
+    border-radius: 6px !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+    box-shadow: none !important;
+}
+
+.file-upload-container,
+.file-upload-area {
+    background: #f8fafc !important;
+    border-color: #d1d5db !important;
+    border-radius: 8px !important;
+}
+
+.report-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.report-controls {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.report-results {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.active-records-panel {
+    order: 1;
+    margin-top: 0 !important;
+    padding: 16px !important;
+}
+
+.report-summary {
+    order: 2;
+    padding: 16px;
+}
+
+.report-table-container {
+    order: 3;
+    padding: 16px;
+}
+
+.summary-grid {
+    gap: 10px;
+}
+
+.summary-item {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+}
+
+.table-wrapper {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: auto;
+}
+
+.maintenance-table {
+    border-collapse: collapse;
+    width: 100%;
+    background: #ffffff;
+}
+
+.maintenance-table th,
+#active-records-table th {
+    background: #f3f4f6 !important;
+    color: #374151 !important;
+    font-weight: 700 !important;
+    border-bottom: 1px solid #d1d5db !important;
+    padding: 11px 12px !important;
+    text-align: left !important;
+}
+
+.maintenance-table td,
+#active-records-table td {
+    color: #111827 !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding: 11px 12px !important;
+}
+
+.maintenance-table tbody tr:hover,
+#active-records-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+#active-records-table td span {
+    color: #f59e0b !important;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 999px;
+    padding: 4px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#active-records-table button {
+    background: #111827 !important;
+    color: #ffffff !important;
+    border: 1px solid #111827 !important;
+    padding: 7px 12px !important;
+}
+
+.btn-primary,
+.report-controls .btn-primary,
+.table-controls button,
+.active-records-controls button {
+    background: #111827 !important;
+    border-color: #111827 !important;
+    color: #ffffff !important;
+}
+
+.btn-secondary,
+.report-controls .btn-secondary {
+    background: #ffffff !important;
+    border: 1px solid #d1d5db !important;
+    color: #374151 !important;
+}
+
+@media (max-width: 1300px) {
+    .main-content-area {
+        grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(3, minmax(150px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-content {
+        padding: 12px;
+    }
+
+    .stats-grid,
+    .form-buttons {
+        grid-template-columns: 1fr;
+    }
+
+    .report-controls,
+    .active-records-controls,
+    .table-controls {
+        display: grid !important;
+        grid-template-columns: 1fr;
+    }
+}

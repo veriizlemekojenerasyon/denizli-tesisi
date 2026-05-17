@@ -297,7 +297,7 @@ async function getLastRecordForMotor(motor) {
         let motorRecords = [];
         
         // Önce cache'den dene
-        if (cachedRecords.length > 0) {
+        if (typeof cachedRecords !== 'undefined' && cachedRecords.length > 0) {
             motorRecords = cachedRecords.filter(record => 
                 record.motor === motor && 
                 record.durum !== 'MOTOR ÇALIŞMIYOR' // Sadece normal kayıtları al

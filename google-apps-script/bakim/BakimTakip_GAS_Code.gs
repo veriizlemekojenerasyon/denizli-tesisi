@@ -10,6 +10,12 @@ const DRIVE_FOLDERS = {
   FAULT: "1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9"     // Arıza Bakım Drive ID (Periyodik ile aynı)
 };
 
+const KOJEN_ENERJI_API_URL = "https://script.google.com/macros/s/AKfycbyZriErX9t75eevT-2FWlVFCF_3JCDQ-f26EONhvge8anXrDnr0iTkzhM1QhUUWQcLwYA/exec";
+const OIL_SAMPLE_INTERVAL_HOURS = 500;
+const OIL_SAMPLE_WARNING_HOURS = 400;
+const ALTERNATOR_GREASE_INTERVAL_HOURS = 1000;
+const ALTERNATOR_GREASE_WARNING_HOURS = 900;
+
 const SHEET_NAMES = {
   PERIODIC_MAINTENANCE: "Periyodik Bakım Kayıtları",
   NORMAL_MAINTENANCE: "Normal Bakım Kayıtları", 
@@ -55,7 +61,7 @@ function doPost(e) {
       case 'closeRecord':
         return closeRecord(ss, params);
       case 'getMotorHours':
-        return getMotorHours(ss);
+        return getMotorHoursV2(ss);
       case 'updateMotorHours':
         return updateMotorHours(ss, params);
       case 'updateOilSample':
@@ -1592,6 +1598,131 @@ function closeRecord(ss, params) {
     Logger.log('Kayıt kapatılırken hata: ' + error.toString());
     return createResponse(false, 'Kayıt kapatılamadı: ' + error.toString());
   }
+}
+
+function getMotorHoursV2(ss) {
+  try {
+    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
+    if (!sheet) {
+      return createResponse(false, 'Motor Saatleri sayfasi bulunamadi');
+    }
+
+    const data = sheet.getRange(2, 1, 3, 10).getValues();
+    const motors = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      const motorName = row[0];
+      const energyHours = getLatestEnergyMotorHours(ss, motorName);
+      const currentHours = energyHours > 0 ? energyHours : parseBakimNumber(row[1]);
+
+      const lastOilSample = parseBakimNumber(row[2]);
+      const nextOilSample = parseBakimNumber(row[4]) || (lastOilSample + OIL_SAMPLE_INTERVAL_HOURS);
+      const oilElapsedHours = Math.max(0, currentHours - lastOilSample);
+      const remainingOilHours = Math.max(0, OIL_SAMPLE_INTERVAL_HOURS - oilElapsedHours);
+      const needsOilSample = oilElapsedHours >= OIL_SAMPLE_INTERVAL_HOURS;
+      const warnsOilSample = oilElapsedHours >= OIL_SAMPLE_WARNING_HOURS && !needsOilSample;
+
+      const lastAlternatorGrease = parseBakimNumber(row[6]);
+      const nextAlternatorGrease = parseBakimNumber(row[8]) || (lastAlternatorGrease + ALTERNATOR_GREASE_INTERVAL_HOURS);
+      const alternatorElapsedHours = Math.max(0, currentHours - lastAlternatorGrease);
+      const remainingAltHours = Math.max(0, ALTERNATOR_GREASE_INTERVAL_HOURS - alternatorElapsedHours);
+      const needsAlternatorGrease = alternatorElapsedHours >= ALTERNATOR_GREASE_INTERVAL_HOURS;
+      const warnsAlternatorGrease = alternatorElapsedHours >= ALTERNATOR_GREASE_WARNING_HOURS && !needsAlternatorGrease;
+
+      motors.push({
+        motor: motorName,
+        currentHours: currentHours,
+        currentHoursSource: energyHours > 0 ? 'Enerji' : 'Motor Saatleri',
+        lastOilSampleHours: lastOilSample,
+        lastOilSampleDate: row[3],
+        nextOilSampleHours: nextOilSample,
+        oilElapsedHours: oilElapsedHours,
+        remainingOilHours: remainingOilHours,
+        needsOilSample: needsOilSample,
+        warnsOilSample: warnsOilSample,
+        notes: row[5],
+        lastAlternatorGreaseHours: lastAlternatorGrease,
+        lastAlternatorGreaseDate: row[7],
+        nextAlternatorGreaseHours: nextAlternatorGrease,
+        alternatorElapsedHours: alternatorElapsedHours,
+        remainingAltHours: remainingAltHours,
+        needsAlternatorGrease: needsAlternatorGrease,
+        warnsAlternatorGrease: warnsAlternatorGrease,
+        alternatorNotes: row[9]
+      });
+    }
+
+    return createResponse(true, 'Motor saatleri getirildi', { motors: motors });
+  } catch (error) {
+    Logger.log('Motor saatleri getirilirken hata: ' + error.toString());
+    return createResponse(false, 'Motor saatleri getirilemedi: ' + error.toString());
+  }
+}
+
+function getLatestEnergyMotorHours(ss, motor) {
+  const localHours = getLatestEnergyMotorHoursFromSheets(ss, motor);
+  if (localHours > 0) return localHours;
+  return getLatestEnergyMotorHoursFromApi(motor);
+}
+
+function getLatestEnergyMotorHoursFromSheets(ss, motor) {
+  const sheetNames = [
+    'Enerji GM-' + motor,
+    'Enerji ' + motor,
+    'Enerji ' + String(motor || '').replace('-', ' ')
+  ];
+
+  for (let i = 0; i < sheetNames.length; i++) {
+    const sheet = ss.getSheetByName(sheetNames[i]);
+    if (!sheet || sheet.getLastRow() < 2) continue;
+
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getDisplayValues();
+    for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
+      const hours = parseBakimNumber(rows[rowIndex][13]);
+      if (hours > 0) return hours;
+    }
+  }
+
+  return 0;
+}
+
+function getLatestEnergyMotorHoursFromApi(motor) {
+  try {
+    const response = UrlFetchApp.fetch(KOJEN_ENERJI_API_URL + '?action=getLastRecords&count=120', {
+      method: 'get',
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return 0;
+
+    const payload = JSON.parse(response.getContentText());
+    if (!payload.success || !payload.data) return 0;
+
+    for (let i = 0; i < payload.data.length; i++) {
+      const record = payload.data[i];
+      if (String(record.motor || '').trim() === String(motor || '').trim()) {
+        return parseBakimNumber(record.calismaSaati);
+      }
+    }
+  } catch (error) {
+    Logger.log('Enerji motor saati alinamadi: ' + error.toString());
+  }
+
+  return 0;
+}
+
+function parseBakimNumber(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return value;
+
+  let normalized = String(value).trim();
+  if (normalized.indexOf(',') !== -1) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  }
+
+  const parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : parsed;
 }
 
 // Motor saatlerini getir
