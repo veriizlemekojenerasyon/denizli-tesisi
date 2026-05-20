@@ -859,10 +859,10 @@ function saatlikInstallHourlyMissingRecordTrigger() {
 
   ScriptApp.newTrigger('saatlikCheckHourlyMissingRecords')
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(1)
     .create();
 
-  return { success: true, message: 'Saatlik eksik kayit tetikleyicisi kuruldu' };
+  return { success: true, message: 'Saatlik eksik kayit tetikleyicisi kuruldu. Kontrol 59. dakikada veya sonraki ilk tetiklemede yapilir.' };
 }
 
 function saatlikGetTriggerHealth() {
@@ -895,7 +895,7 @@ function saatlikGetTriggerHealth() {
 
 function saatlikGetHourlyCheckTarget(date) {
   var target = new Date(date);
-  if (target.getMinutes() < 55) {
+  if (target.getMinutes() < 59) {
     target.setHours(target.getHours() - 1);
   }
 

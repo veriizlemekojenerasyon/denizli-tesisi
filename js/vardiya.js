@@ -74,9 +74,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Vardiya Google Apps Script URL
     const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbylytHcQf5Uf_exGe9UZxwie9r8xzYhKFzRcrEBd0OLm7rXjulkkMd33O63rn0KL3QXeg/exec';
     const VARDIYA_CONTROL_URLS = {
-        saatlik: 'https://script.google.com/macros/s/AKfycbyNov_Ynr4EifhOqXBb2YUAON9ctyUemz_ms1qLC_FygxC18HZ8mcnEThddZYjYdP7sdg/exec',
-        motor: 'https://script.google.com/macros/s/AKfycbztrKVv4ioi72xRo7g7_YcaA9zAxq12wdvQk7o2yLMjV5FozhVnquc970_iuuhulrGySw/exec',
-        enerji: 'https://script.google.com/macros/s/AKfycbyTefsxh9IOyLXrAoFeaxsjunnYpv42a205JTA7byRV0GgLGc9_35Rftp_lkX0KrQfhFw/exec',
+        saatlik: 'https://script.google.com/macros/s/AKfycbyb2Cww6ah8SzBUr3rgkvzuQuwRf-vJ2cMgw4xulxmjcEO34BNzhbky8QCWNIoUBXa7_Q/exec',
+        motor: 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec',
+        enerji: 'https://script.google.com/macros/s/AKfycby5FigD2Hj_Qq9fzrjDjPmg44xQUGu2gklxfdXFS8UD6wIFtwhgbdUC9lIj3EkYb3tViQ/exec',
         bildirim: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec'
     };
     
@@ -472,11 +472,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const anaOperatorId = personelSelect.value;
         
         // Mevcut operatÃ¶rler (seÃ§ili olan hariÃ§)
-        const yardimciOperatÃ¶rler = personelListesi.filter(p => 
+        const yardimciOperatorler = personelListesi.filter(p => 
             p.operator === true && p.id != anaOperatorId && p.pozisyon === 'OperatÃ¶r'
         );
         
-        if (yardimciOperatÃ¶rler.length === 0) {
+        if (yardimciOperatorler.length === 0) {
             // YardÄ±mcÄ± operatÃ¶r yok
             const option = document.createElement('option');
             option.value = "";
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', function() {
             option.disabled = true;
             yardimciOperator.appendChild(option);
         } else {
-            yardimciOperatÃ¶rler.forEach(personel => {
+            yardimciOperatorler.forEach(personel => {
                 const option = document.createElement('option');
                 option.value = personel.id;
                 option.textContent = `${personel.adSoyad} - ${personel.pozisyon}`;

@@ -37,8 +37,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Buhar verisi config
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec';
-    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyTefsxh9IOyLXrAoFeaxsjunnYpv42a205JTA7byRV0GgLGc9_35Rftp_lkX0KrQfhFw/exec';
-    const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbztrKVv4ioi72xRo7g7_YcaA9zAxq12wdvQk7o2yLMjV5FozhVnquc970_iuuhulrGySw/exec';
+    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby5FigD2Hj_Qq9fzrjDjPmg44xQUGu2gklxfdXFS8UD6wIFtwhgbdUC9lIj3EkYb3tViQ/exec';
+    const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec';
     const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzPyZrQ77uxqfy1SR32dWUqy4EymmhrtW7deH6g81L9AA76JUYfZNvmUbRHbViv2m2v/exec';
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
     const defaultAnnouncements = [
@@ -118,7 +118,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (!result.success) {
-                console.error('Dashboard ozeti alinamadi:', result.error);
+                const errorText = String(result.error || result.message || '');
+                if (errorText.includes('Geçersiz işlem') || errorText.includes('Gecersiz islem')) {
+                    console.warn('Dashboard ozeti bu Apps Script deployunda yok; getLastRecords fallback kullaniliyor.');
+                } else {
+                    console.error('Dashboard ozeti alinamadi:', result.error);
+                }
                 return false;
             }
 
@@ -779,8 +784,5 @@ function checkAuth() {
         });
     }
 }
-
-// checkAuth fonksiyonunu çağır
-checkAuth();
 
 // ... (geri kalan kod)

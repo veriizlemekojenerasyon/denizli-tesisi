@@ -8,7 +8,7 @@
 // ============================================
 const SAATLIK_CONFIG = {
     // Google Apps Script Web App URL
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyNov_Ynr4EifhOqXBb2YUAON9ctyUemz_ms1qLC_FygxC18HZ8mcnEThddZYjYdP7sdg/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyb2Cww6ah8SzBUr3rgkvzuQuwRf-vJ2cMgw4xulxmjcEO34BNzhbky8QCWNIoUBXa7_Q/exec',
     
     // Sayfa baÅŸlÄ±ÄŸÄ±
     PAGE_NAME: 'Saatlik Veri GiriÅŸi',
@@ -555,10 +555,10 @@ const SaatlikApp = {
     startAutoRecordCheck: function() {
         console.log('ğŸ”¥ Otomatik kayÄ±t kontrolÃ¼ baÅŸlatÄ±lÄ±yor...');
         
-        // Her 30 saniyede bir kontrol et
+        // Her dakika kontrol et; hedef saat 59. dakika kuralina gore belirlenir.
         setInterval(() => {
             this.checkAndAutoRecord();
-        }, 30000);
+        }, 60 * 1000);
         
         // Sayfa yÃ¼klendiÄŸinde de kontrol et
         setTimeout(() => {
@@ -646,11 +646,11 @@ const SaatlikApp = {
     }
 };
 
-// Dayanikli otomatik kontrol: 55. dakikadan sonra mevcut saati,
+// Dayanikli otomatik kontrol: 59. dakikadan sonra mevcut saati,
 // sonraki saatte ise bir onceki saati kontrol eder.
 SaatlikApp.getHourlyCheckTarget = function(date) {
     const target = new Date(date);
-    if (target.getMinutes() < 55) {
+    if (target.getMinutes() < 59) {
         target.setHours(target.getHours() - 1);
     }
 

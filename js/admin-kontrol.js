@@ -1,7 +1,7 @@
 ﻿const AdminControlConfig = {
-    saatlik: 'https://script.google.com/macros/s/AKfycbyNov_Ynr4EifhOqXBb2YUAON9ctyUemz_ms1qLC_FygxC18HZ8mcnEThddZYjYdP7sdg/exec',
-    motor: 'https://script.google.com/macros/s/AKfycbztrKVv4ioi72xRo7g7_YcaA9zAxq12wdvQk7o2yLMjV5FozhVnquc970_iuuhulrGySw/exec',
-    enerji: 'https://script.google.com/macros/s/AKfycbyTefsxh9IOyLXrAoFeaxsjunnYpv42a205JTA7byRV0GgLGc9_35Rftp_lkX0KrQfhFw/exec',
+    saatlik: 'https://script.google.com/macros/s/AKfycbyb2Cww6ah8SzBUr3rgkvzuQuwRf-vJ2cMgw4xulxmjcEO34BNzhbky8QCWNIoUBXa7_Q/exec',
+    motor: 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec',
+    enerji: 'https://script.google.com/macros/s/AKfycby5FigD2Hj_Qq9fzrjDjPmg44xQUGu2gklxfdXFS8UD6wIFtwhgbdUC9lIj3EkYb3tViQ/exec',
     buhar: 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec',
     gunluk: 'https://script.google.com/macros/s/AKfycbyJILN_PHL9Tw_BxRf_TuAOOsc7YqpmYQCgc-MYuhNJeRgiL9P9tczw2njQ7HndQE_8XA/exec',
     vardiya: 'https://script.google.com/macros/s/AKfycbylytHcQf5Uf_exGe9UZxwie9r8xzYhKFzRcrEBd0OLm7rXjulkkMd33O63rn0KL3QXeg/exec',

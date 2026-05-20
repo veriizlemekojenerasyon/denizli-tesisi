@@ -1477,15 +1477,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Motor verisi girilmediyse mail uyarısı gönder
-    async function checkAndSendMissingMotorMail() {
-        const now = new Date();
+    function getMissingMotorCheckTarget(date = new Date()) {
+        const target = new Date(date);
+        if (target.getMinutes() < 59) {
+            target.setHours(target.getHours() - 1);
+        }
 
-        const hour = String(now.getHours()).padStart(2, '0');
-        const saat = `${hour}:00`;
-        const day = String(now.getDate()).padStart(2, '0');
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-        const tarih = `${day}.${month}.${year}`;
+        const hour = String(target.getHours()).padStart(2, '0');
+        const day = String(target.getDate()).padStart(2, '0');
+        const month = String(target.getMonth() + 1).padStart(2, '0');
+        const year = target.getFullYear();
+
+        return {
+            tarih: `${day}.${month}.${year}`,
+            saat: `${hour}:00`
+        };
+    }
+
+    async function checkAndSendMissingMotorMail() {
+        const { tarih, saat } = getMissingMotorCheckTarget(new Date());
         const sentKey = `kojenMotorMissingMailSent:${tarih}:${saat}`;
 
         if (typeof runKojenMotorHourlyMissingRecordCheck === 'function') {
@@ -1553,7 +1563,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setInterval(() => {
             checkAndSendMissingMotorMail();
-        }, 5 * 60 * 1000);
+        }, 60 * 1000);
 
         setTimeout(() => {
             checkAndSendMissingMotorMail();

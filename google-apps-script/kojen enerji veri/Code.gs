@@ -318,10 +318,14 @@ function getLastEnerjiCountersBefore(sheet, tarih, saat) {
   }
 }
 
-function getCounterOrLatest(value, latestValue) {
+function getLatestCounterOrFallback(value, latestValue) {
   var parsed = parseEnerjiNumber(value);
   var latest = parseEnerjiNumber(latestValue);
-  return parsed > 0 ? parsed : latest;
+  return latest > 0 ? latest : parsed;
+}
+
+function getCounterOrLatest(value, latestValue) {
+  return getLatestCounterOrFallback(value, latestValue);
 }
 
 // 🔥 MOTOR BAZLI SAYFA GETİRME FONKSİYONU
@@ -433,9 +437,9 @@ function addRecord(data) {
     if (durum === 'MOTOR ÇALIŞMIYOR') {
       var zeroValue = parseEnerjiNumber('0.00');
       var latestCounters = getLastEnerjiCountersBefore(sheet, formattedTarih, data.saat);
-      var toplamAktifEnerji = getCounterOrLatest(data.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
-      var calismaSaati = getCounterOrLatest(data.calismaSaati, latestCounters.calismaSaati);
-      var kalkisSayisi = getCounterOrLatest(data.kalkisSayisi, latestCounters.kalkisSayisi);
+      var toplamAktifEnerji = getLatestCounterOrFallback(data.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
+      var calismaSaati = getLatestCounterOrFallback(data.calismaSaati, latestCounters.calismaSaati);
+      var kalkisSayisi = getLatestCounterOrFallback(data.kalkisSayisi, latestCounters.kalkisSayisi);
 
       values = [
         formattedTarih, data.vardiya, data.saat, motor,
@@ -917,7 +921,7 @@ function getDashboardMaintenanceSummary(records) {
 
 function fetchDashboardExternalData() {
   var urls = {
-    motor: 'https://script.google.com/macros/s/AKfycbztrKVv4ioi72xRo7g7_YcaA9zAxq12wdvQk7o2yLMjV5FozhVnquc970_iuuhulrGySw/exec?action=getLastRecords&count=100',
+    motor: 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec?action=getLastRecords&count=100',
     buhar: 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec?action=getLastRecords&count=1',
     announcements: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec?action=getAnnouncements&active=true'
   };
@@ -2009,9 +2013,9 @@ function addMultipleRecords(dataString) {
           rowData[9] = zeroValue;
           rowData[10] = zeroValue;
           rowData[11] = zeroValue;
-          rowData[12] = getCounterOrLatest(record.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
-          rowData[13] = getCounterOrLatest(record.calismaSaati, latestCounters.calismaSaati);
-          rowData[14] = getCounterOrLatest(record.kalkisSayisi, latestCounters.kalkisSayisi);
+          rowData[12] = getLatestCounterOrFallback(record.toplamAktifEnerji, latestCounters.toplamAktifEnerji);
+          rowData[13] = getLatestCounterOrFallback(record.calismaSaati, latestCounters.calismaSaati);
+          rowData[14] = getLatestCounterOrFallback(record.kalkisSayisi, latestCounters.kalkisSayisi);
         }
         
         // Satırı ekle
@@ -2595,10 +2599,10 @@ function installHourlyMissingRecordTrigger() {
 
   ScriptApp.newTrigger('checkHourlyMissingRecords')
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(1)
     .create();
 
-  return { success: true, message: 'Enerji saatlik eksik kayit tetikleyicisi kuruldu' };
+  return { success: true, message: 'Enerji saatlik eksik kayit tetikleyicisi kuruldu. Kontrol 59. dakikada veya sonraki ilk tetiklemede yapilir.' };
 }
 
 function getTriggerHealth() {
@@ -2637,7 +2641,7 @@ function getVardiyaByHour(hour) {
 
 function getHourlyCheckTarget(date) {
   var target = new Date(date);
-  if (target.getMinutes() < 55) {
+  if (target.getMinutes() < 59) {
     target.setHours(target.getHours() - 1);
   }
   return {

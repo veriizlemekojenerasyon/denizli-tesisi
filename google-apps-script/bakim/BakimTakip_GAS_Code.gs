@@ -10,7 +10,7 @@ const DRIVE_FOLDERS = {
   FAULT: "1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9"     // Arıza Bakım Drive ID (Periyodik ile aynı)
 };
 
-const KOJEN_ENERJI_API_URL = "https://script.google.com/macros/s/AKfycbyZriErX9t75eevT-2FWlVFCF_3JCDQ-f26EONhvge8anXrDnr0iTkzhM1QhUUWQcLwYA/exec";
+const KOJEN_ENERJI_API_URL = "https://script.google.com/macros/s/AKfycby5FigD2Hj_Qq9fzrjDjPmg44xQUGu2gklxfdXFS8UD6wIFtwhgbdUC9lIj3EkYb3tViQ/exec";
 const OIL_SAMPLE_INTERVAL_HOURS = 500;
 const OIL_SAMPLE_WARNING_HOURS = 400;
 const ALTERNATOR_GREASE_INTERVAL_HOURS = 1000;

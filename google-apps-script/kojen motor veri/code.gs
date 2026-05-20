@@ -1625,10 +1625,10 @@ function installHourlyMissingRecordTrigger() {
 
   ScriptApp.newTrigger('checkHourlyMissingRecords')
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(1)
     .create();
 
-  return { success: true, message: 'Motor saatlik eksik kayit tetikleyicisi kuruldu' };
+  return { success: true, message: 'Motor saatlik eksik kayit tetikleyicisi kuruldu. Kontrol 59. dakikada veya sonraki ilk tetiklemede yapilir.' };
 }
 
 function getTriggerHealth() {
@@ -1667,7 +1667,7 @@ function getVardiyaByHour(hour) {
 
 function getHourlyCheckTarget(date) {
   var target = new Date(date);
-  if (target.getMinutes() < 55) {
+  if (target.getMinutes() < 59) {
     target.setHours(target.getHours() - 1);
   }
   return {

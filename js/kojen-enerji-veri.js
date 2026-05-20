@@ -218,15 +218,25 @@ function getSaatDegeri(saat) {
 }
 
 // Enerji verisi girilmediyse mail uyarısı gönder
-async function checkAndSendMissingEnerjiMail() {
-    const now = new Date();
+function getMissingEnerjiCheckTarget(date = new Date()) {
+    const target = new Date(date);
+    if (target.getMinutes() < 59) {
+        target.setHours(target.getHours() - 1);
+    }
 
-    const hour = String(now.getHours()).padStart(2, '0');
-    const saat = `${hour}:00`;
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = now.getFullYear();
-    const tarih = `${day}.${month}.${year}`;
+    const hour = String(target.getHours()).padStart(2, '0');
+    const day = String(target.getDate()).padStart(2, '0');
+    const month = String(target.getMonth() + 1).padStart(2, '0');
+    const year = target.getFullYear();
+
+    return {
+        tarih: `${day}.${month}.${year}`,
+        saat: `${hour}:00`
+    };
+}
+
+async function checkAndSendMissingEnerjiMail() {
+    const { tarih, saat } = getMissingEnerjiCheckTarget(new Date());
     const sentKey = `kojenEnerjiMissingMailSent:${tarih}:${saat}`;
 
     if (typeof runKojenEnerjiHourlyMissingRecordCheck === 'function') {
@@ -296,7 +306,7 @@ function startMissingEnerjiMailCheck() {
 
     setInterval(() => {
         checkAndSendMissingEnerjiMail();
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
 
     setTimeout(() => {
         checkAndSendMissingEnerjiMail();
