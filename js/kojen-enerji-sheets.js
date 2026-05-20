@@ -4,7 +4,7 @@
  */
 
 const KojenEnerjiSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyZriErX9t75eevT-2FWlVFCF_3JCDQ-f26EONhvge8anXrDnr0iTkzhM1QhUUWQcLwYA/exec',
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbyTefsxh9IOyLXrAoFeaxsjunnYpv42a205JTA7byRV0GgLGc9_35Rftp_lkX0KrQfhFw/exec',
     EMAIL_ENABLED: true,
     EMAIL_TO: 'mrtcsk0320@gmail.com',
     EMAIL_SUBJECT: 'Kojen Enerji Veri Uyarısı - Kayıt Girilmedi'
@@ -260,6 +260,19 @@ async function sendKojenEnerjiEmailAlert(subject, body) {
  * @param {Array} records - Kaydedilecek enerji kayıtları
  * @returns {Promise<Object>} - Kayıt sonuçları
  */
+async function runKojenEnerjiHourlyMissingRecordCheck() {
+    try {
+        const url = new URL(KojenEnerjiSheetsConfig.WEB_APP_URL);
+        url.searchParams.append('action', 'checkHourlyMissingRecords');
+
+        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+        return await response.json();
+    } catch (error) {
+        console.error('Kojen enerji otomatik kayit kontrolu hatasi:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 async function addMultipleEnerjiRecords(records) {
     console.log('🚀 Çoklu enerji kaydı gönderiliyor:', records.length, 'kayıt');
     
@@ -299,3 +312,4 @@ window.getLastEnerjiRecords = getLastEnerjiRecords;
 window.getAllEnerjiRecords = getAllEnerjiRecords;
 window.addMultipleEnerjiRecords = addMultipleEnerjiRecords;
 window.sendKojenEnerjiEmailAlert = sendKojenEnerjiEmailAlert;
+window.runKojenEnerjiHourlyMissingRecordCheck = runKojenEnerjiHourlyMissingRecordCheck;

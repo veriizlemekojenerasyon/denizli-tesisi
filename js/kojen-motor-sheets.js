@@ -4,7 +4,7 @@
  */
 
 const KojenMotorSheetsConfig = {
-    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzqMKhkZXsKyywOZ3D-Ks3xzLz4HxBeR6vkLUdD57nfgcgf5NJleuAt24uv1-1Av7-jHQ/exec',
+    WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbztrKVv4ioi72xRo7g7_YcaA9zAxq12wdvQk7o2yLMjV5FozhVnquc970_iuuhulrGySw/exec',
     EMAIL_ENABLED: true,
     EMAIL_TO: 'mrtcsk0320@gmail.com',
     EMAIL_SUBJECT: 'Kojen Motor Veri Uyarısı - Kayıt Girilmedi'
@@ -266,6 +266,19 @@ async function sendKojenMotorEmailAlert(subject, body) {
  * @param {Array} records - Kaydedilecek motor verileri dizisi
  * @returns {Promise<Object>} - Kayıt sonucu
  */
+async function runKojenMotorHourlyMissingRecordCheck() {
+    try {
+        const url = new URL(KojenMotorSheetsConfig.WEB_APP_URL);
+        url.searchParams.append('action', 'checkHourlyMissingRecords');
+
+        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+        return await response.json();
+    } catch (error) {
+        console.error('Kojen motor otomatik kayit kontrolu hatasi:', error);
+        return { success: false, error: error.message };
+    }
+}
+
 async function addMultipleMotorRecords(records) {
     try {
         const url = KojenMotorSheetsConfig.WEB_APP_URL;
@@ -313,3 +326,4 @@ window.getLastMotorRecords = getLastMotorRecords;
 window.getAllMotorRecords = getAllMotorRecords;
 window.addMultipleMotorRecords = addMultipleMotorRecords;
 window.sendKojenMotorEmailAlert = sendKojenMotorEmailAlert;
+window.runKojenMotorHourlyMissingRecordCheck = runKojenMotorHourlyMissingRecordCheck;

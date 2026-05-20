@@ -175,21 +175,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sayfa yüklenince kontrol et
     checkFormStatus();
     
-    // Sayısal inputlara otomatik formatlama
-    const numberInputs = document.querySelectorAll('input[type="number"]');
-    numberInputs.forEach(input => {
-        input.addEventListener('blur', function() {
-            if (this.value) {
-                const step = this.getAttribute('step');
-                if (step === '0.001') {
-                    this.value = parseFloat(this.value).toFixed(3);
-                } else if (step === '0.1') {
-                    this.value = parseFloat(this.value).toFixed(1);
-                }
-            }
-        });
-    });
-    
     // Bildirim fonksiyonu
     function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
@@ -292,22 +277,27 @@ function renderRecordsTable(records, tableBody) {
         return;
     }
     
+    const formatValue = (value) => {
+        if (value === null || value === undefined || value === '') return '-';
+        return String(value);
+    };
+
     let html = '';
     records.forEach((record, index) => {
         html += `
             <tr>
                 <td class="col-num">${index + 1}</td>
                 <td class="col-date">${formatDate(record.TARIH)}</td>
-                <td class="col-oil">${record.YAGSEVIYESI?.toFixed(1) || '-'}</td>
-                <td class="col-kuplaj">${record.KUPLAJ?.toFixed(3) || '-'}</td>
-                <td class="col-gm">${record.GM1?.toFixed(3) || '-'}</td>
-                <td class="col-gm">${record.GM2?.toFixed(3) || '-'}</td>
-                <td class="col-gm">${record.GM3?.toFixed(3) || '-'}</td>
-                <td class="col-consumption">${record.ICIHTIYAC?.toFixed(3) || '-'}</td>
-                <td class="col-redresor">${record.REDRESOR1?.toFixed(3) || '-'}</td>
-                <td class="col-redresor">${record.REDRESOR2?.toFixed(3) || '-'}</td>
-                <td class="col-kojen">${record.KOJENICIHTIYAC?.toFixed(3) || '-'}</td>
-                <td class="col-consumption">${record.SERVISTRAFO?.toFixed(3) || '-'}</td>
+                <td class="col-oil">${formatValue(record.YAGSEVIYESI)}</td>
+                <td class="col-kuplaj">${formatValue(record.KUPLAJ)}</td>
+                <td class="col-gm">${formatValue(record.GM1)}</td>
+                <td class="col-gm">${formatValue(record.GM2)}</td>
+                <td class="col-gm">${formatValue(record.GM3)}</td>
+                <td class="col-consumption">${formatValue(record.ICIHTIYAC)}</td>
+                <td class="col-redresor">${formatValue(record.REDRESOR1)}</td>
+                <td class="col-redresor">${formatValue(record.REDRESOR2)}</td>
+                <td class="col-kojen">${formatValue(record.KOJENICIHTIYAC)}</td>
+                <td class="col-consumption">${formatValue(record.SERVISTRAFO)}</td>
             </tr>
         `;
     });

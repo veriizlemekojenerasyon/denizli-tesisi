@@ -1,6 +1,6 @@
-/**
+﻿/**
  * SAATLIK VERI GIRISI - Google Sheets Entegrasyonu
- * Bu dosya saatlik-veri-giris.html için Google Sheets bağlantısını sağlar
+ * Bu dosya saatlik-veri-giris.html iÃ§in Google Sheets baÄŸlantÄ±sÄ±nÄ± saÄŸlar
  */
 
 // ============================================
@@ -8,34 +8,34 @@
 // ============================================
 const SAATLIK_CONFIG = {
     // Google Apps Script Web App URL
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwNEMx76k1ZE6dNWP7XtoxY8NCc7eDzF31Utfd6I03qXDlQVPaAH7iJRcWvDL9ED7yzqQ/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyNov_Ynr4EifhOqXBb2YUAON9ctyUemz_ms1qLC_FygxC18HZ8mcnEThddZYjYdP7sdg/exec',
     
-    // Sayfa başlığı
-    PAGE_NAME: 'Saatlik Veri Girişi',
+    // Sayfa baÅŸlÄ±ÄŸÄ±
+    PAGE_NAME: 'Saatlik Veri GiriÅŸi',
     
-    // Varsayılan kullanıcı adı
+    // VarsayÄ±lan kullanÄ±cÄ± adÄ±
     DEFAULT_USER: 'Admin',
     
-    // 📧 Mail uyarı ayarları
-    EMAIL_ENABLED: true, // Mail gönderme aç/kapa
-    EMAIL_TO: 'mrtcsk0320@gmail.com', // Uyarı maili gönderilecek adres
-    EMAIL_SUBJECT: 'Saatlik Veri Girişi Uyarısı - Kayıt Girilmedi'
+    // ğŸ“§ Mail uyarÄ± ayarlarÄ±
+    EMAIL_ENABLED: true, // Mail gÃ¶nderme aÃ§/kapa
+    EMAIL_TO: 'mrtcsk0320@gmail.com', // UyarÄ± maili gÃ¶nderilecek adres
+    EMAIL_SUBJECT: 'Saatlik Veri GiriÅŸi UyarÄ±sÄ± - KayÄ±t Girilmedi'
 };
 
 // ============================================
-// SAATLIK VERI SAYFASI ANA NESNESİ
+// SAATLIK VERI SAYFASI ANA NESNESÄ°
 // ============================================
 const SaatlikApp = {
     
     init: function() {
-        console.log('SaatlikApp başlatılıyor...');
+        console.log('SaatlikApp baÅŸlatÄ±lÄ±yor...');
         
         this.manualSlotSelected = false;
         this.setupEventListeners();
         this.setInitialValues();
         this.loadLastRecords();
         
-        // 🔥 OTOMATİK KAYIT KONTROLÜ BAŞLAT
+        // ğŸ”¥ OTOMATÄ°K KAYIT KONTROLÃœ BAÅLAT
         this.startAutoRecordCheck();
     },
     
@@ -164,8 +164,8 @@ const SaatlikApp = {
     },
     
     checkExistingRecord: async function() {
-        // Kayıt kontrolü için placeholder
-        // Google Sheets entegrasyonu yapıldığında aktif edilecek
+        // KayÄ±t kontrolÃ¼ iÃ§in placeholder
+        // Google Sheets entegrasyonu yapÄ±ldÄ±ÄŸÄ±nda aktif edilecek
     },
     
     handleFormSubmit: async function(e) {
@@ -178,7 +178,7 @@ const SaatlikApp = {
         const originalBtnText = submitBtn ? submitBtn.textContent : 'Kaydet';
         
         if (submitBtn) {
-            submitBtn.textContent = 'KAYDEDİLİYOR...';
+            submitBtn.textContent = 'KAYDEDÄ°LÄ°YOR...';
             submitBtn.disabled = true;
         }
         
@@ -192,7 +192,7 @@ const SaatlikApp = {
         };
         
         if (!formData.tarih || !formData.saat) {
-            this.showNotification('Hata', 'Lütfen tarih ve saat seçin!', 'error');
+            this.showNotification('Hata', 'LÃ¼tfen tarih ve saat seÃ§in!', 'error');
             if (submitBtn) {
                 submitBtn.textContent = originalBtnText;
                 submitBtn.disabled = false;
@@ -208,15 +208,15 @@ const SaatlikApp = {
         }
         
         if (result.success) {
-            this.showNotification('Başarılı', result.message, 'success');
+            this.showNotification('BaÅŸarÄ±lÄ±', result.message, 'success');
             this.loadLastRecords();
             this.lockForm(true);
         } else {
-            this.showNotification('Hata', result.error || 'İşlem başarısız!', 'error');
+            this.showNotification('Hata', result.error || 'Ä°ÅŸlem baÅŸarÄ±sÄ±z!', 'error');
         }
     },
     
-    // Kayıt var mı kontrol et (Google Sheets)
+    // KayÄ±t var mÄ± kontrol et (Google Sheets)
     isExistingRecord: async function(tarih, saat) {
         try {
             const url = new URL(SAATLIK_CONFIG.APPS_SCRIPT_URL);
@@ -229,29 +229,29 @@ const SaatlikApp = {
             
             return result.success && result.found;
         } catch (error) {
-            console.error('Kayıt kontrolü hatası:', error);
+            console.error('KayÄ±t kontrolÃ¼ hatasÄ±:', error);
             return false;
         }
     },
     
-    // Google Sheets'e yeni kayıt ekle
+    // Google Sheets'e yeni kayÄ±t ekle
     addRecord: async function(data) {
         try {
-            // Kaydeden kullanıcı bilgisini ekle
+            // Kaydeden kullanÄ±cÄ± bilgisini ekle
             const loggedInUser = localStorage.getItem('loggedInUser');
             if (loggedInUser) {
                 try {
                     const user = JSON.parse(loggedInUser);
                     const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-                    data.kaydeden = fullName || user.email || 'Bilinmeyen Kullanıcı';
-                    console.log('👤 Kaydeden kullanıcı:', data.kaydeden);
+                    data.kaydeden = fullName || user.email || 'Bilinmeyen KullanÄ±cÄ±';
+                    console.log('ğŸ‘¤ Kaydeden kullanÄ±cÄ±:', data.kaydeden);
                 } catch (e) {
-                    console.error('Kullanıcı bilgileri okunamadı:', e);
-                    data.kaydeden = 'Bilinmeyen Kullanıcı';
+                    console.error('KullanÄ±cÄ± bilgileri okunamadÄ±:', e);
+                    data.kaydeden = 'Bilinmeyen KullanÄ±cÄ±';
                 }
             } else {
-                data.kaydeden = 'Misafir Kullanıcı';
-                console.log('👤 Giriş yapılmadı, misafir olarak kaydediliyor');
+                data.kaydeden = 'Misafir KullanÄ±cÄ±';
+                console.log('ğŸ‘¤ GiriÅŸ yapÄ±lmadÄ±, misafir olarak kaydediliyor');
             }
             
             const url = new URL(SAATLIK_CONFIG.APPS_SCRIPT_URL);
@@ -263,16 +263,16 @@ const SaatlikApp = {
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
             return await response.json();
         } catch (error) {
-            console.error('Kayıt ekleme hatası:', error);
+            console.error('KayÄ±t ekleme hatasÄ±:', error);
             return { success: false, error: error.message };
         }
     },
     
-    // 📧 Mail gönderme fonksiyonu
+    // ğŸ“§ Mail gÃ¶nderme fonksiyonu
     sendEmailAlert: async function(subject, body) {
         if (!SAATLIK_CONFIG.EMAIL_ENABLED) {
-            console.log('📧 Mail gönderme kapalı');
-            return { success: true, message: 'Mail gönderme kapalı' };
+            console.log('ğŸ“§ Mail gÃ¶nderme kapalÄ±');
+            return { success: true, message: 'Mail gÃ¶nderme kapalÄ±' };
         }
         
         try {
@@ -285,32 +285,32 @@ const SaatlikApp = {
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
             const result = await response.json();
             
-            console.log('📧 Mail sonucu:', result);
+            console.log('ğŸ“§ Mail sonucu:', result);
             return result;
         } catch (error) {
-            console.error('Mail gönderme hatası:', error);
+            console.error('Mail gÃ¶nderme hatasÄ±:', error);
             return { success: false, error: error.message };
         }
     },
     
-    // Google Sheets'te kayıt güncelle
+    // Google Sheets'te kayÄ±t gÃ¼ncelle
     updateRecord: async function(data) {
         try {
-            // Kaydeden kullanıcı bilgisini ekle
+            // Kaydeden kullanÄ±cÄ± bilgisini ekle
             const loggedInUser = localStorage.getItem('loggedInUser');
             if (loggedInUser) {
                 try {
                     const user = JSON.parse(loggedInUser);
                     const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-                    data.kaydeden = fullName || user.email || 'Bilinmeyen Kullanıcı';
-                    console.log('👤 Kaydeden kullanıcı (güncelleme):', data.kaydeden);
+                    data.kaydeden = fullName || user.email || 'Bilinmeyen KullanÄ±cÄ±';
+                    console.log('ğŸ‘¤ Kaydeden kullanÄ±cÄ± (gÃ¼ncelleme):', data.kaydeden);
                 } catch (e) {
-                    console.error('Kullanıcı bilgileri okunamadı:', e);
-                    data.kaydeden = 'Bilinmeyen Kullanıcı';
+                    console.error('KullanÄ±cÄ± bilgileri okunamadÄ±:', e);
+                    data.kaydeden = 'Bilinmeyen KullanÄ±cÄ±';
                 }
             } else {
-                data.kaydeden = 'Misafir Kullanıcı';
-                console.log('👤 Giriş yapılmadı, misafir olarak güncelleniyor');
+                data.kaydeden = 'Misafir KullanÄ±cÄ±';
+                console.log('ğŸ‘¤ GiriÅŸ yapÄ±lmadÄ±, misafir olarak gÃ¼ncelleniyor');
             }
             
             const url = new URL(SAATLIK_CONFIG.APPS_SCRIPT_URL);
@@ -322,7 +322,7 @@ const SaatlikApp = {
             const response = await fetch(url, { method: 'GET', mode: 'cors' });
             return await response.json();
         } catch (error) {
-            console.error('Kayıt güncelleme hatası:', error);
+            console.error('KayÄ±t gÃ¼ncelleme hatasÄ±:', error);
             return { success: false, error: error.message };
         }
     },
@@ -330,7 +330,7 @@ const SaatlikApp = {
     saveToLocal: function(data) {
         let records = JSON.parse(localStorage.getItem('saatlikVeriler') || '[]');
         
-        // Aynı tarih/saat varsa güncelle
+        // AynÄ± tarih/saat varsa gÃ¼ncelle
         const existingIndex = records.findIndex(r => r.tarih === data.tarih && r.saat === data.saat);
         
         if (existingIndex >= 0) {
@@ -339,7 +339,7 @@ const SaatlikApp = {
             records.unshift(data);
         }
         
-        // Sadece son 48 kaydı tut
+        // Sadece son 48 kaydÄ± tut
         if (records.length > 48) {
             records = records.slice(0, 48);
         }
@@ -363,12 +363,12 @@ const SaatlikApp = {
                 this.renderTable(result.data);
                 this.renderMissingHours(result.data);
             } else {
-                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">Kayıtlar yüklenemedi.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">KayÄ±tlar yÃ¼klenemedi.</td></tr>';
                 this.renderMissingHours([]);
             }
         } catch (error) {
-            console.error('Kayıtlar yüklenirken hata:', error);
-            // Hata durumunda localStorage'dan göster
+            console.error('KayÄ±tlar yÃ¼klenirken hata:', error);
+            // Hata durumunda localStorage'dan gÃ¶ster
             const records = JSON.parse(localStorage.getItem('saatlikVeriler') || '[]');
             this.renderTable(records);
             this.renderMissingHours(records);
@@ -466,7 +466,7 @@ const SaatlikApp = {
         if (!tableBody) return;
         
         if (!records || records.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">Henüz kayıt bulunmuyor.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: #64748b;">HenÃ¼z kayÄ±t bulunmuyor.</td></tr>';
             return;
         }
         
@@ -499,13 +499,13 @@ const SaatlikApp = {
     },
     
     handleLogout: function() {
-        if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
+        if (confirm('Ã‡Ä±kÄ±ÅŸ yapmak istediÄŸinizden emin misiniz?')) {
             localStorage.removeItem('rememberedEmail');
             window.location.href = 'anasayfa.html';
         }
     },
     
-    // Form inputlarını kilitle/aç
+    // Form inputlarÄ±nÄ± kilitle/aÃ§
     lockForm: function(locked) {
         const inputs = document.querySelectorAll('#saatlikVeriForm input:not([type="date"]):not(#saat), #saatlikVeriForm select:not(#tarih):not(#saat), #saatlikVeriForm textarea');
         
@@ -551,67 +551,67 @@ const SaatlikApp = {
         setTimeout(() => notification.remove(), 4000);
     },
     
-    // 🔥 OTOMATİK KAYIT KONTROLÜ
+    // ğŸ”¥ OTOMATÄ°K KAYIT KONTROLÃœ
     startAutoRecordCheck: function() {
-        console.log('🔥 Otomatik kayıt kontrolü başlatılıyor...');
+        console.log('ğŸ”¥ Otomatik kayÄ±t kontrolÃ¼ baÅŸlatÄ±lÄ±yor...');
         
         // Her 30 saniyede bir kontrol et
         setInterval(() => {
             this.checkAndAutoRecord();
         }, 30000);
         
-        // Sayfa yüklendiğinde de kontrol et
+        // Sayfa yÃ¼klendiÄŸinde de kontrol et
         setTimeout(() => {
             this.checkAndAutoRecord();
         }, 5000);
     },
     
-    // 🔥 OTOMATİK KAYIT KONTROLÜ VE GÖNDERİM
+    // ğŸ”¥ OTOMATÄ°K KAYIT KONTROLÃœ VE GÃ–NDERÄ°M
     checkAndAutoRecord: async function() {
         const now = new Date();
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
         
-        console.log(`🔥 Saat kontrolü: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
+        console.log(`ğŸ”¥ Saat kontrolÃ¼: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`);
         
-        // Her saatin 59. dakikasında kontrol et (08:59, 09:59, 10:59, vb.)
+        // Her saatin 59. dakikasÄ±nda kontrol et (08:59, 09:59, 10:59, vb.)
         if (currentMinute !== 59) {
             return;
         }
         
-        console.log(`🔥 ${currentHour}:59 kontrolü yapılıyor...`);
+        console.log(`ğŸ”¥ ${currentHour}:59 kontrolÃ¼ yapÄ±lÄ±yor...`);
         
-        // Bugünün tarihini al
+        // BugÃ¼nÃ¼n tarihini al
         const today = new Date();
         const year = today.getFullYear();
         const month = String(today.getMonth() + 1).padStart(2, '0');
         const day = String(today.getDate()).padStart(2, '0');
         const todayStr = `${year}-${month}-${day}`;
         
-        // Geçerli saat için kayıt var mı kontrol et
+        // GeÃ§erli saat iÃ§in kayÄ±t var mÄ± kontrol et
         const checkHour = String(currentHour).padStart(2, '0') + ':00';
         const hasRecord = await this.isExistingRecord(todayStr, checkHour);
         
         if (!hasRecord) {
-            console.log(`🚨 ${checkHour} kaydı bulunamadı! Otomatik kayıt gönderiliyor...`);
+            console.log(`ğŸš¨ ${checkHour} kaydÄ± bulunamadÄ±! Otomatik kayÄ±t gÃ¶nderiliyor...`);
             
             // Vardiya belirle
             const vardiya = this.getVardiyaByHour(currentHour);
             
-            // Otomatik kayıt verileri
-            // Kaydeden kullanıcı bilgisini al
+            // Otomatik kayÄ±t verileri
+            // Kaydeden kullanÄ±cÄ± bilgisini al
             const loggedInUser = localStorage.getItem('loggedInUser');
-            let kaydedenKullanici = 'OTOMATİK SİSTEM';
+            let kaydedenKullanici = 'OTOMATÄ°K SÄ°STEM';
             
             if (loggedInUser) {
                 try {
                     const user = JSON.parse(loggedInUser);
                     const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
-                    kaydedenKullanici = fullName || user.email || 'Bilinmeyen Kullanıcı';
-                    console.log('👤 Otomatik kayıt - Kaydeden kullanıcı:', kaydedenKullanici);
+                    kaydedenKullanici = fullName || user.email || 'Bilinmeyen KullanÄ±cÄ±';
+                    console.log('ğŸ‘¤ Otomatik kayÄ±t - Kaydeden kullanÄ±cÄ±:', kaydedenKullanici);
                 } catch (e) {
-                    console.error('Kullanıcı bilgileri okunamadı:', e);
-                    kaydedenKullanici = 'Bilinmeyen Kullanıcı';
+                    console.error('KullanÄ±cÄ± bilgileri okunamadÄ±:', e);
+                    kaydedenKullanici = 'Bilinmeyen KullanÄ±cÄ±';
                 }
             }
             
@@ -621,27 +621,27 @@ const SaatlikApp = {
                 vardiya: vardiya,
                 aktifMwh: '0',
                 reaktifMwh: '0',
-                notlar: 'KAYIT GİRİLMEDİ',
+                notlar: 'KAYIT GÄ°RÄ°LMEDÄ°',
                 kaydeden: kaydedenKullanici
             };
             
-            // Kaydı gönder
+            // KaydÄ± gÃ¶nder
             const result = await this.addRecord(autoData);
             
             if (result.success) {
-                console.log(`✅ Otomatik ${checkHour} kaydı başarıyla gönderildi!`);
-                this.showNotification('Otomatik Kayıt', `${checkHour} verisi otomatik olarak kaydedildi (Kayıt girilmedi)`, 'warning');
+                console.log(`âœ… Otomatik ${checkHour} kaydÄ± baÅŸarÄ±yla gÃ¶nderildi!`);
+                this.showNotification('Otomatik KayÄ±t', `${checkHour} verisi otomatik olarak kaydedildi (KayÄ±t girilmedi)`, 'warning');
                 this.loadLastRecords();
                 
-                // 📧 Mail gönder
-                const mailBody = `Saatlik Veri Girişi Uyarısı\n\nTarih: ${todayStr}\nSaat: ${checkHour}\nVardiya: ${vardiya}\n\n${checkHour} için saatlik veri girilmedi. Otomatik olarak boş kayıt yapıldı.\n\nLütfen ilgili personeli bilgilendirin.`;
-                await this.sendEmailAlert(`Saatlik Veri Girişi Uyarısı - ${checkHour} Kayıt Girilmedi`, mailBody);
+                // ğŸ“§ Mail gÃ¶nder
+                const mailBody = `Saatlik Veri GiriÅŸi UyarÄ±sÄ±\n\nTarih: ${todayStr}\nSaat: ${checkHour}\nVardiya: ${vardiya}\n\n${checkHour} iÃ§in saatlik veri girilmedi. Otomatik olarak boÅŸ kayÄ±t yapÄ±ldÄ±.\n\nLÃ¼tfen ilgili personeli bilgilendirin.`;
+                await this.sendEmailAlert(`Saatlik Veri GiriÅŸi UyarÄ±sÄ± - ${checkHour} KayÄ±t Girilmedi`, mailBody);
                 
             } else {
-                console.error('❌ Otomatik kayıt başarısız:', result.error);
+                console.error('âŒ Otomatik kayÄ±t baÅŸarÄ±sÄ±z:', result.error);
             }
         } else {
-            console.log(`✅ ${checkHour} kaydı mevcut, otomatik kayıt gerekmiyor`);
+            console.log(`âœ… ${checkHour} kaydÄ± mevcut, otomatik kayÄ±t gerekmiyor`);
         }
     }
 };
@@ -670,6 +670,27 @@ SaatlikApp.getHourlyCheckTarget = function(date) {
 SaatlikApp.checkAndAutoRecord = async function() {
     const target = this.getHourlyCheckTarget(new Date());
     const sentKey = `saatlikAutoRecordCheck:${target.tarih}:${target.saat}`;
+
+    try {
+        const url = new URL(SAATLIK_CONFIG.APPS_SCRIPT_URL);
+        url.searchParams.append('action', 'checkHourlyMissingRecords');
+        const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+        const serverResult = await response.json();
+
+        if (serverResult.success) {
+            if (serverResult.added) {
+                this.showNotification('Otomatik Kayit', `${target.saat} verisi otomatik olarak kaydedildi`, 'warning');
+                this.loadLastRecords();
+            }
+            localStorage.setItem(sentKey, new Date().toISOString());
+            return;
+        }
+
+        console.error('Saatlik sunucu otomatik kayit kontrolu basarisiz:', serverResult.error);
+    } catch (error) {
+        console.error('Saatlik sunucu otomatik kayit kontrolu hatasi:', error);
+    }
+
     if (localStorage.getItem(sentKey)) return;
 
     const hasRecord = await this.isExistingRecord(target.isoTarih, target.saat);
@@ -716,9 +737,9 @@ SaatlikApp.checkAndAutoRecord = async function() {
 };
 
 // ============================================
-// SAYFA YÜKLENDİĞİNDE BAŞLAT
+// SAYFA YÃœKLENDÄ°ÄÄ°NDE BAÅLAT
 // ============================================
-// Kimlik dogrulama kontrolü
+// Kimlik dogrulama kontrolÃ¼
 function checkAuth() {
     const loggedInUser = localStorage.getItem('loggedInUser');
     if (!loggedInUser) {
@@ -730,7 +751,7 @@ function checkAuth() {
         const user = JSON.parse(loggedInUser);
         const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
         
-        // Tüm userNameDisplay elementlerini güncelle
+        // TÃ¼m userNameDisplay elementlerini gÃ¼ncelle
         const allUserNameDisplays = document.querySelectorAll('[id="userNameDisplay"]');
         
         allUserNameDisplays.forEach((element, index) => {
@@ -748,12 +769,12 @@ function checkAuth() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Önce kimlik dogrulama kontrolü
+    // Ã–nce kimlik dogrulama kontrolÃ¼
     checkAuth();
     
     SaatlikApp.init();
     
-    // Sayısal inputlara formatlama
+    // SayÄ±sal inputlara formatlama
     document.querySelectorAll('input[type="number"]').forEach(input => {
         input.addEventListener('blur', function() {
             if (this.value) {
@@ -762,3 +783,4 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+

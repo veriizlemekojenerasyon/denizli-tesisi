@@ -72,6 +72,15 @@ function handleRequest(e) {
       case 'checkHourlyMissingRecords':
         result = checkHourlyMissingRecords();
         break;
+      case 'fillMissingFullDay':
+        result = fillMissingFullDay(params.tarih, params.motor, params.startSaat, params.endSaat);
+        break;
+      case 'sortEnergySheet':
+        result = sortEnergySheet(params.motor);
+        break;
+      case 'colorizeEnergySheet':
+        result = colorizeEnergySheet(params.motor);
+        break;
       case 'installHourlyMissingRecordTrigger':
         result = installHourlyMissingRecordTrigger();
         break;
@@ -107,7 +116,7 @@ function handleRequest(e) {
 }
 
 function isWriteAction(action) {
-  return ['addRecord', 'addMultipleRecords', 'sendEmail', 'checkHourlyMissingRecords', 'installHourlyMissingRecordTrigger', 'updateYearlyEnergySheet', 'updateYearlyEnergySummarySheet', 'backupYearlyEnergySheets'].indexOf(action) !== -1;
+  return ['addRecord', 'addMultipleRecords', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingFullDay', 'sortEnergySheet', 'colorizeEnergySheet', 'installHourlyMissingRecordTrigger', 'updateYearlyEnergySheet', 'updateYearlyEnergySummarySheet', 'backupYearlyEnergySheets'].indexOf(action) !== -1;
 }
 
 function getApiHealth() {
@@ -128,6 +137,9 @@ function getApiHealth() {
       'getDashboardSummary',
       'sendEmail',
       'checkHourlyMissingRecords',
+      'fillMissingFullDay',
+      'sortEnergySheet',
+      'colorizeEnergySheet',
       'installHourlyMissingRecordTrigger',
       'getTriggerHealth',
       'getSystemLogs',
@@ -174,8 +186,69 @@ function normalizeEnerjiDurum(durum) {
   return value;
 }
 
+function normalizeEnerjiMotorLabel(motor) {
+  var value = String(motor || 'GM-1').trim().toUpperCase();
+  if (!value) return 'GM-1';
+  value = value.replace(/\s+/g, '');
+  var gmMatch = value.match(/GM-?(\d+)$/);
+  if (gmMatch) return 'GM-' + gmMatch[1];
+  if (/^\d+$/.test(value)) return 'GM-' + value;
+  return 'GM-' + value;
+}
+
+function getEnerjiSheetName(motor) {
+  return 'Enerji ' + normalizeEnerjiMotorLabel(motor);
+}
+
 function getEnerjiSheetIfExists(motor) {
-  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Enerji GM-' + motor);
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var targetMotor = normalizeEnerjiMotorLabel(motor);
+  var sheets = spreadsheet.getSheets();
+  var bestSheet = null;
+  var bestScore = -1;
+  var bestRowCount = -1;
+
+  for (var i = 0; i < sheets.length; i++) {
+    var currentSheet = sheets[i];
+    var sheetName = currentSheet.getName();
+    if (sheetName.indexOf('YillikEnerji') === 0 || sheetName === 'SistemLoglari') {
+      continue;
+    }
+
+    if (currentSheet.getLastColumn() < 4) {
+      continue;
+    }
+
+    var score = 0;
+    var dataRowCount = Math.max(0, currentSheet.getLastRow() - 1);
+    var normalizedSheetMotor = normalizeEnerjiMotorLabel(sheetName.replace(/^Enerji\s+/i, ''));
+    if (normalizedSheetMotor === targetMotor) {
+      score += 10;
+    }
+
+    if (currentSheet.getLastRow() >= 2) {
+      var rowCount = Math.min(currentSheet.getLastRow() - 1, 500);
+      var motorValues = currentSheet.getRange(2, 4, rowCount, 1).getDisplayValues();
+      for (var j = 0; j < motorValues.length; j++) {
+        var rawMotor = String(motorValues[j][0] || '').trim();
+        if (rawMotor && normalizeEnerjiMotorLabel(rawMotor) === targetMotor) {
+          score++;
+        }
+      }
+    }
+
+    if (score > bestScore || (score === bestScore && dataRowCount > bestRowCount)) {
+      bestScore = score;
+      bestRowCount = dataRowCount;
+      bestSheet = currentSheet;
+    }
+  }
+
+  if (bestScore > 0) {
+    return bestSheet;
+  }
+
+  return spreadsheet.getSheetByName(getEnerjiSheetName(targetMotor));
 }
 
 function mapEnerjiRow(row) {
@@ -254,9 +327,13 @@ function getCounterOrLatest(value, latestValue) {
 // 🔥 MOTOR BAZLI SAYFA GETİRME FONKSİYONU
 function getOrCreateSheet(motor) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var existingSheet = getEnerjiSheetIfExists(motor);
+  if (existingSheet) {
+    return existingSheet;
+  }
   
   // Motor bazlı sayfa adı
-  var sheetName = 'Enerji GM-' + motor;
+  var sheetName = getEnerjiSheetName(motor);
   var sheet = spreadsheet.getSheetByName(sheetName);
   
   if (!sheet) {
@@ -312,8 +389,11 @@ function getOrCreateSheet(motor) {
 function addRecord(data) {
   try {
     // Motor bilgisinden sayfa adı belirle
-    var motor = data.motor || '1';
-    var sheet = getOrCreateSheet(motor);
+    var motor = normalizeEnerjiMotorLabel(data.motor);
+    var sheet = data.onlyExistingSheet ? getEnerjiSheetIfExists(motor) : getOrCreateSheet(motor);
+    if (!sheet) {
+      return { success: false, error: motor + ' icin mevcut enerji sayfasi bulunamadi. Yeni sayfa olusturulmadi.' };
+    }
     
     // Zorunlu alanları kontrol et
     if (!data.tarih || !data.vardiya || !data.saat || !data.motor) {
@@ -341,15 +421,6 @@ function addRecord(data) {
     // Tarih formatını düzelt ve Sheets formatına çevir
     var formattedTarih = normalizeDateTR(data.tarih);
     
-    // dd.MM.yyyy formatını tarih nesnesine çevir
-    var tarihObj;
-    if (formattedTarih.includes('.')) {
-      var tarihParts = formattedTarih.split('.');
-      tarihObj = new Date(tarihParts[2], tarihParts[1] - 1, tarihParts[0]);
-    } else {
-      tarihObj = new Date(formattedTarih);
-    }
-    
     // Kayıt zamanı
     var kayitTarihi = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm:ss');
     
@@ -367,7 +438,7 @@ function addRecord(data) {
       var kalkisSayisi = getCounterOrLatest(data.kalkisSayisi, latestCounters.kalkisSayisi);
 
       values = [
-        tarihObj, data.vardiya, data.saat, data.motor,
+        formattedTarih, data.vardiya, data.saat, motor,
         zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, zeroValue, // Diğer değerler 0.00 (8 tane)
         toplamAktifEnerji, // M sütunu - son değer
         calismaSaati,      // N sütunu - son değer
@@ -376,10 +447,10 @@ function addRecord(data) {
       ];
     } else {
       values = [
-        tarihObj,
+        formattedTarih,
         data.vardiya,
         data.saat,
-        data.motor,
+        motor,
         parseFloat(data.aydemVoltaji) || 0,
         parseFloat(data.aktifGuc) || 0,
         parseFloat(data.reaktifGuc) || 0,
@@ -398,7 +469,10 @@ function addRecord(data) {
     }
     
     // 🔥 SAAT SIRALAMASI İÇİN DOĞRU KONUMU BUL
-    var insertRow = sheet.getLastRow() + 1;
+    var insertRow = findInsertPositionByDateTime(sheet, formattedTarih, data.saat);
+    if (insertRow <= sheet.getLastRow()) {
+      sheet.insertRowBefore(insertRow);
+    }
     sheet.getRange(insertRow, 1, 1, 18).setValues([values]);
     
     // Yeni eklenen satırın formatını ayarla
@@ -411,15 +485,18 @@ function addRecord(data) {
     // Sayısal sütunları ortala
     sheet.getRange(newRow, 5, 1, 11).setNumberFormat('0.00');
     
-    // Motor çalışmıyor durumunda kırmızı arka plan
+    colorizeDates(sheet, [{ tarih: formattedTarih, saat: data.saat, row: newRow }]);
+
+    // Motor çalışmıyor durumunda yazıyı kırmızı yap, tarih rengini ezme
     if (durum === 'MOTOR ÇALIŞMIYOR') {
-      dataRange.setBackground('#ffebee');
       dataRange.setFontColor('#c62828');
     }
     
-    var yearlyResult = updateYearlyEnergyAfterRecord(data.motor, formattedTarih, data.saat);
+    var yearlyResult = data.skipYearlyUpdate === true
+      ? { success: true, skipped: true }
+      : updateYearlyEnergyAfterRecord(motor, formattedTarih, data.saat);
 
-    return { success: true, message: data.motor + ' motoru için enerji kaydı başarıyla eklendi!', yearly: yearlyResult };
+    return { success: true, message: motor + ' motoru için enerji kaydı başarıyla eklendi!', yearly: yearlyResult };
     
   } catch (error) {
     return { success: false, error: error.toString() };
@@ -520,14 +597,14 @@ function checkExistingRecord(motor, tarih, saat) {
     }
 
     var searchTarih = normalizeDateTR(tarih);
-    var searchMotor = String(motor || '').trim();
+    var searchMotor = normalizeEnerjiMotorLabel(motor);
     var searchSaat = String(saat || '').trim();
     var data = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getDisplayValues();
     var existing = null;
 
     for (var i = 0; i < data.length; i++) {
       var record = mapEnerjiRow(data[i]);
-      var recMotor = String(record.motor || '').trim();
+      var recMotor = normalizeEnerjiMotorLabel(record.motor);
       var recTarih = String(record.tarih || '').trim();
       var recSaat = String(record.saat || '').trim();
 
@@ -562,7 +639,7 @@ function checkMultipleRecords(data) {
       var parts = kombinasyonlar[i].split('|');
       if (parts.length !== 3) continue;
 
-      var motor = parts[0].trim();
+      var motor = normalizeEnerjiMotorLabel(parts[0]);
       var tarih = parts[1].trim();
       var saat = parts[2].trim();
       var searchTarih = normalizeDateTR(tarih);
@@ -576,7 +653,7 @@ function checkMultipleRecords(data) {
       }
 
       var existing = recordsByMotor[motor].find(function(record) {
-        var recMotor = String(record.motor || '').trim();
+        var recMotor = normalizeEnerjiMotorLabel(record.motor);
         var recTarih = String(record.tarih || '').trim();
         var recSaat = String(record.saat || '').trim();
 
@@ -887,7 +964,7 @@ function fetchDashboardExternalData() {
 function updateYearlyEnergySheet(year, motor) {
   try {
     var targetYear = parseInt(year, 10) || new Date().getFullYear();
-    var motors = motor ? [String(motor).trim()] : ['GM-1', 'GM-2', 'GM-3'];
+    var motors = motor ? [normalizeEnerjiMotorLabel(motor)] : ['GM-1', 'GM-2', 'GM-3'];
     var results = [];
 
     for (var i = 0; i < motors.length; i++) {
@@ -921,7 +998,7 @@ function updateYearlyEnergySheet(year, motor) {
 
 function getOrCreateYearlyEnergySheet(motor, year) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  var sheetName = 'YillikEnerji-' + String(motor || '').trim() + '-' + String(year || '').trim();
+  var sheetName = 'YillikEnerji-' + normalizeEnerjiMotorLabel(motor) + '-' + String(year || '').trim();
   var sheet = spreadsheet.getSheetByName(sheetName);
   if (!sheet) {
     sheet = spreadsheet.insertSheet(sheetName);
@@ -1183,7 +1260,7 @@ function updateYearlyEnergyAfterAddedRecords(addedRecords) {
         var date = parseEnerjiDateOnly(affectedDates[j]);
         if (!date) continue;
 
-        var motor = String(record.motor || '').trim();
+        var motor = normalizeEnerjiMotorLabel(record.motor);
         var year = date.getFullYear();
         var groupKey = motor + '|' + year;
         if (!grouped[groupKey]) {
@@ -1873,8 +1950,9 @@ function addMultipleRecords(dataString) {
         var record = records[i];
         
         // Motor için doğru sayfayı al ve sakla
-        var sheet = getOrCreateSheet(record.motor);
-        motorSheets[record.motor] = sheet;
+        var motor = normalizeEnerjiMotorLabel(record.motor);
+        var sheet = getOrCreateSheet(motor);
+        motorSheets[motor] = sheet;
         
         // Tarih formatını kontrol et (Türkçe formatında tut)
         var tarih = record.tarih;
@@ -1885,7 +1963,7 @@ function addMultipleRecords(dataString) {
           tarih || '',                                     // Tarih
           record.vardiya || '',                            // Vardiya
           record.saat || '',                               // Saat
-          record.motor || '',                              // Motor
+          motor || '',                                     // Motor
           record.aydemVoltaji || '0',                      // L1-L2 AYDEM VOLTAJI
           record.aktifGuc || '0',                          // (P) AKTİF GÜÇ
           record.reaktifGuc || '0',                        // (Q) REAKTİF GÜÇ
@@ -1937,10 +2015,9 @@ function addMultipleRecords(dataString) {
         dataRange.setFontSize(10);
         dataRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
         sheet.getRange(newRow, 5, 1, 11).setNumberFormat('0.00');
-        dataRange.setBackground('#ffebee');
         dataRange.setFontColor('#c62828');
         addedRecords.push({
-          motor: record.motor,
+          motor: motor,
           tarih: record.tarih,
           saat: record.saat,
           row: newRow
@@ -1956,11 +2033,6 @@ function addMultipleRecords(dataString) {
     
     console.log('📊 Çoklu enerji kayıt sonucu: ' + addedRecords.length + ' eklendi, ' + errors.length + ' hata');
     
-    // 🔥 Her motor için tarihleri renklendir
-    for (var motorName in motorSheets) {
-      var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
-      colorizeDates(motorSheets[motorName], motorRecords);
-    }
     for (var j = 0; j < addedRecords.length; j++) {
       var addedRecord = addedRecords[j];
       var addedSheet = motorSheets[addedRecord.motor];
@@ -1970,9 +2042,13 @@ function addMultipleRecords(dataString) {
         addedRange.setFontSize(10);
         addedRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
         addedSheet.getRange(addedRecord.row, 5, 1, 11).setNumberFormat('0.00');
-        addedRange.setBackground('#ffebee');
         addedRange.setFontColor('#c62828');
       }
+    }
+    // Tarih rengini en son uygula; durum yazı rengi korunur.
+    for (var motorName in motorSheets) {
+      var motorRecords = addedRecords.filter(function(r) { return r.motor === motorName; });
+      colorizeDates(motorSheets[motorName], motorRecords);
     }
     var yearlyResult = updateYearlyEnergyAfterAddedRecords(addedRecords);
     
@@ -2009,10 +2085,14 @@ function checkHourlyMissingRecords() {
 
     var motors = ['GM-1', 'GM-2', 'GM-3'];
     var missing = [];
+    var existingErrors = [];
     for (var i = 0; i < motors.length; i++) {
       var exists = checkExistingRecord(motors[i], tarih, saat);
       if (!exists.success || !exists.exists) {
         missing.push(motors[i]);
+        if (!exists.success) {
+          existingErrors.push(motors[i] + ': ' + exists.error);
+        }
       }
     }
 
@@ -2032,9 +2112,10 @@ function checkHourlyMissingRecords() {
 
     var added = [];
     var errors = [];
+    var addedRecords = [];
+    var sheetsByMotor = {};
     for (var j = 0; j < missing.length; j++) {
       var motor = missing[j];
-      var lastNormal = getLastNormalRecordBefore(motor, tarih, saat);
       var autoData = {
         tarih: tarih,
         vardiya: vardiya,
@@ -2042,17 +2123,31 @@ function checkHourlyMissingRecords() {
         motor: motor,
         kaydeden: 'OTOMATIK SISTEM',
         durum: 'MOTOR ÇALIŞMIYOR',
-        toplamAktifEnerji: lastNormal ? lastNormal.toplamAktifEnerji : '0',
-        calismaSaati: lastNormal ? lastNormal.calismaSaati : '0',
-        kalkisSayisi: lastNormal ? lastNormal.kalkisSayisi : '0'
+        toplamAktifEnerji: '0',
+        calismaSaati: '0',
+        kalkisSayisi: '0',
+        skipYearlyUpdate: true
       };
       var addResult = addRecord(autoData);
       if (addResult.success) {
         added.push(motor);
+        addedRecords.push({ motor: motor, tarih: tarih, saat: saat });
+        sheetsByMotor[motor] = getEnerjiSheetIfExists(motor);
       } else {
         errors.push(motor + ': ' + addResult.error);
       }
     }
+
+    for (var sheetMotor in sheetsByMotor) {
+      if (!sheetsByMotor[sheetMotor]) continue;
+      colorizeDates(sheetsByMotor[sheetMotor], addedRecords.filter(function(record) {
+        return record.motor === sheetMotor;
+      }));
+    }
+
+    var yearlyResult = addedRecords.length
+      ? updateYearlyEnergyAfterAddedRecords(addedRecords)
+      : { success: true, skipped: true };
 
     var subject = 'Kojen Enerji Veri Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
     var body = 'Kojen Enerji Veri Uyarisi\n\n' +
@@ -2061,6 +2156,7 @@ function checkHourlyMissingRecords() {
       'Vardiya: ' + vardiya + '\n\n' +
       'Eksik motor enerji kayitlari: ' + missing.join(', ') + '\n' +
       'Otomatik bos kayit eklenenler: ' + (added.length ? added.join(', ') : '-') + '\n' +
+      (existingErrors.length ? 'Kontrol hatalari: ' + existingErrors.join('; ') + '\n' : '') +
       (errors.length ? 'Kayit hatalari: ' + errors.join('; ') + '\n' : '') +
       '\nBu saat icin veri girilmedigi icin sistem otomatik bos kayit olusturdu.';
 
@@ -2075,7 +2171,7 @@ function checkHourlyMissingRecords() {
       eksikKayit: missing.join(', '),
       otomatikKayitSonucu: added.length + '/' + missing.length + ' basarili',
       mailSonucu: mailResult.success ? 'Basarili' : 'Basarisiz',
-      hataMesaji: errors.concat(mailResult.success ? [] : [mailResult.error]).join('; '),
+      hataMesaji: existingErrors.concat(errors).concat(mailResult.success ? [] : [mailResult.error]).join('; '),
       detay: 'Otomatik motor calismiyor enerji kaydi'
     });
 
@@ -2083,8 +2179,11 @@ function checkHourlyMissingRecords() {
       success: true,
       missingCount: missing.length,
       addedCount: added.length,
-      errors: errors,
-      mail: mailResult
+      missing: missing,
+      added: added,
+      errors: existingErrors.concat(errors),
+      mail: mailResult,
+      yearly: yearlyResult
     };
   } catch (error) {
     addSystemLog({
@@ -2095,6 +2194,334 @@ function checkHourlyMissingRecords() {
       detay: 'checkHourlyMissingRecords'
     });
     return { success: false, error: error.toString() };
+  }
+}
+
+function fillMissingFullDay(tarih, motor, startSaat, endSaat) {
+  try {
+    var targetTarih = normalizeDateTR(tarih || '');
+    var motors = motor ? [normalizeEnerjiMotorLabel(motor)] : ['GM-1', 'GM-2', 'GM-3'];
+    var startHour = startSaat ? parseInt(normalizeEnerjiSaat(startSaat).split(':')[0], 10) : 0;
+    var endHour = endSaat ? parseInt(normalizeEnerjiSaat(endSaat).split(':')[0], 10) : 23;
+
+    if (isNaN(startHour) || isNaN(endHour) || startHour < 0 || endHour > 23 || endHour < startHour) {
+      return { success: false, error: 'Saat araligi hatali. Ornek: 00:00 - 23:00' };
+    }
+
+    var dates = [];
+    if (targetTarih) {
+      dates.push(targetTarih);
+    } else {
+      var allRecords = getRecords();
+      if (!allRecords.success) return allRecords;
+      var dateMap = {};
+      for (var r = 0; r < allRecords.data.length; r++) {
+        var recordDate = normalizeDateTR(allRecords.data[r].tarih || '');
+        if (recordDate) dateMap[recordDate] = true;
+      }
+      dates = Object.keys(dateMap).sort(function(a, b) {
+        return parseDateTimeTR(a, '00:00') - parseDateTimeTR(b, '00:00');
+      });
+    }
+
+    if (!dates.length) {
+      return { success: false, error: 'Taranacak tarih bulunamadi.' };
+    }
+
+    var totalAdded = 0;
+    var allErrors = [];
+    var perDate = [];
+    var addedRecords = [];
+
+    for (var d = 0; d < dates.length; d++) {
+      var currentDate = dates[d];
+      var dateResult = {
+        tarih: currentDate,
+        motors: []
+      };
+
+      for (var m = 0; m < motors.length; m++) {
+        var currentMotor = motors[m];
+        var sheet = getEnerjiSheetIfExists(currentMotor);
+        if (!sheet) {
+          var sheetError = currentMotor + ' icin mevcut enerji sayfasi bulunamadi. Yeni sayfa olusturulmadi.';
+          allErrors.push(currentDate + ' ' + currentMotor + ': ' + sheetError);
+          dateResult.motors.push({
+            motor: currentMotor,
+            addedCount: 0,
+            addedHours: [],
+            skippedCount: 0,
+            skippedHours: [],
+            errors: [sheetError]
+          });
+          continue;
+        }
+
+        var lastRow = sheet.getLastRow();
+        var rows = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 18).getDisplayValues() : [];
+        var existingByDateHour = {};
+        var counterRecords = [];
+
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          var existingRecord = mapEnerjiRow(rows[rowIndex]);
+          var existingDate = normalizeDateTR(existingRecord.tarih || '');
+          var existingHour = normalizeEnerjiSaat(existingRecord.saat || '');
+          if (existingDate && existingHour) {
+            existingByDateHour[existingDate + '|' + existingHour] = true;
+          }
+
+          var recordTime = parseDateTimeTR(existingDate, existingHour).getTime();
+          if (isNaN(recordTime)) continue;
+
+          var energy = parseEnerjiNumber(existingRecord.toplamAktifEnerji);
+          var hours = parseEnerjiNumber(existingRecord.calismaSaati);
+          var starts = parseEnerjiNumber(existingRecord.kalkisSayisi);
+          if (energy > 0 || hours > 0 || starts > 0) {
+            counterRecords.push({
+              timestamp: recordTime,
+              toplamAktifEnerji: energy,
+              calismaSaati: hours,
+              kalkisSayisi: starts
+            });
+          }
+        }
+
+        counterRecords.sort(function(a, b) {
+          return a.timestamp - b.timestamp;
+        });
+
+        var rowsToAdd = [];
+        var addedHours = [];
+        var skippedHours = [];
+        var errors = [];
+
+        for (var hour = startHour; hour <= endHour; hour++) {
+          var saat = pad2(hour) + ':00';
+          if (existingByDateHour[currentDate + '|' + saat]) {
+            skippedHours.push(saat);
+            continue;
+          }
+
+          var targetTime = parseDateTimeTR(currentDate, saat).getTime();
+          var latestCounters = {
+            toplamAktifEnerji: 0,
+            calismaSaati: 0,
+            kalkisSayisi: 0
+          };
+          for (var counterIndex = 0; counterIndex < counterRecords.length; counterIndex++) {
+            if (counterRecords[counterIndex].timestamp >= targetTime) break;
+            latestCounters = counterRecords[counterIndex];
+          }
+
+          rowsToAdd.push([
+            currentDate,
+            getVardiyaByHour(hour),
+            saat,
+            currentMotor,
+            0, 0, 0, 0, 0, 0, 0, 0,
+            latestCounters.toplamAktifEnerji,
+            latestCounters.calismaSaati,
+            latestCounters.kalkisSayisi,
+            normalizeEnerjiDurum('MOTOR CALISMIYOR'),
+            'OTOMATIK SISTEM',
+            Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm:ss')
+          ]);
+
+          existingByDateHour[currentDate + '|' + saat] = true;
+          addedHours.push(saat);
+          totalAdded++;
+          addedRecords.push({ motor: currentMotor, tarih: currentDate, saat: saat });
+        }
+
+        if (rowsToAdd.length) {
+          var appendStartRow = sheet.getLastRow() + 1;
+          sheet.getRange(appendStartRow, 1, rowsToAdd.length, 18).setValues(rowsToAdd);
+          var addedRange = sheet.getRange(appendStartRow, 1, rowsToAdd.length, 18);
+          addedRange.setHorizontalAlignment('center');
+          addedRange.setFontSize(10);
+          addedRange.setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+          addedRange.setFontColor('#c62828');
+          sheet.getRange(appendStartRow, 5, rowsToAdd.length, 11).setNumberFormat('0.00');
+          sortEnerjiSheetRowsByDateTime(sheet);
+          colorizeDates(sheet, addedHours.map(function(addedSaat) {
+            return { tarih: currentDate, saat: addedSaat };
+          }));
+        }
+
+        dateResult.motors.push({
+          motor: currentMotor,
+          addedCount: addedHours.length,
+          addedHours: addedHours,
+          skippedCount: skippedHours.length,
+          skippedHours: skippedHours,
+          errors: errors
+        });
+      }
+
+      perDate.push(dateResult);
+    }
+
+    var yearlyResult = addedRecords.length ? updateYearlyEnergyAfterAddedRecords(addedRecords) : { success: true, skipped: true };
+
+    addSystemLog({
+      tarih: targetTarih || dates[0],
+      modul: 'Kojen Enerji',
+      eksikKayit: totalAdded ? ('Toplam ' + totalAdded + ' saat dolduruldu') : 'Yok',
+      otomatikKayitSonucu: totalAdded ? 'Tum gun eksik saat doldurma' : 'Gerekmedi',
+      mailSonucu: 'Gonderilmedi',
+      hataMesaji: allErrors.join('; '),
+      detay: targetTarih ? 'Tek tarih icin kojen enerji eksikleri dolduruldu' : 'Tum tarihler icin kojen enerji eksikleri dolduruldu'
+    });
+
+    return {
+      success: true,
+      scannedDateCount: dates.length,
+      totalAddedCount: totalAdded,
+      dates: perDate,
+      errors: allErrors,
+      yearly: yearlyResult
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function sortEnergySheet(motor) {
+  try {
+    var motors = motor ? [normalizeEnerjiMotorLabel(motor)] : ['GM-1', 'GM-2', 'GM-3'];
+    var results = [];
+
+    for (var i = 0; i < motors.length; i++) {
+      var currentMotor = motors[i];
+      var sheet = getEnerjiSheetIfExists(currentMotor);
+      if (!sheet) {
+        results.push({
+          motor: currentMotor,
+          success: false,
+          error: 'Mevcut enerji sayfasi bulunamadi'
+        });
+        continue;
+      }
+
+      results.push(sortEnerjiSheetRowsByDateTime(sheet, currentMotor));
+    }
+
+    return { success: true, results: results };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function colorizeEnergySheet(motor) {
+  try {
+    var motors = motor ? [normalizeEnerjiMotorLabel(motor)] : ['GM-1', 'GM-2', 'GM-3'];
+    var results = [];
+
+    for (var i = 0; i < motors.length; i++) {
+      var currentMotor = motors[i];
+      var sheet = getEnerjiSheetIfExists(currentMotor);
+      if (!sheet) {
+        results.push({
+          motor: currentMotor,
+          success: false,
+          error: 'Mevcut enerji sayfasi bulunamadi'
+        });
+        continue;
+      }
+
+      var records = [];
+      var lastRow = sheet.getLastRow();
+      if (lastRow >= 2) {
+        var rows = sheet.getRange(2, 1, lastRow - 1, 3).getDisplayValues();
+        for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+          records.push({
+            row: rowIndex + 2,
+            tarih: rows[rowIndex][0],
+            saat: rows[rowIndex][2]
+          });
+        }
+      }
+
+      var colorResult = colorizeDates(sheet, records);
+      results.push({
+        success: colorResult.success !== false,
+        motor: currentMotor,
+        sheetName: sheet.getName(),
+        rowCount: Math.max(0, lastRow - 1),
+        coloredCount: colorResult.coloredCount || 0,
+        error: colorResult.error || ''
+      });
+    }
+
+    return { success: true, results: results };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function sortEnerjiSheetRowsByDateTime(sheet, motor) {
+  try {
+    if (!sheet || sheet.getLastRow() < 3) {
+      return {
+        success: true,
+        sheetName: sheet ? sheet.getName() : '',
+        rowCount: 0,
+        skipped: true
+      };
+    }
+
+    var rowCount = sheet.getLastRow() - 1;
+    var range = sheet.getRange(2, 1, rowCount, 18);
+    var values = range.getValues();
+    var displayValues = range.getDisplayValues();
+    var backgrounds = range.getBackgrounds();
+    var fontColors = range.getFontColors();
+    var rows = [];
+
+    for (var i = 0; i < values.length; i++) {
+      rows.push({
+        values: values[i],
+        backgrounds: backgrounds[i],
+        fontColors: fontColors[i],
+        timestamp: parseDateTimeTR(displayValues[i][0] || values[i][0], displayValues[i][2] || values[i][2]).getTime(),
+        originalIndex: i
+      });
+    }
+
+    rows.sort(function(a, b) {
+      var aTime = isNaN(a.timestamp) ? Number.MAX_SAFE_INTEGER : a.timestamp;
+      var bTime = isNaN(b.timestamp) ? Number.MAX_SAFE_INTEGER : b.timestamp;
+      if (aTime !== bTime) return aTime - bTime;
+      return a.originalIndex - b.originalIndex;
+    });
+
+    var sortedValues = [];
+    var sortedBackgrounds = [];
+    var sortedFontColors = [];
+    for (var j = 0; j < rows.length; j++) {
+      sortedValues.push(rows[j].values);
+      sortedBackgrounds.push(rows[j].backgrounds);
+      sortedFontColors.push(rows[j].fontColors);
+    }
+
+    range.setValues(sortedValues);
+    range.setBackgrounds(sortedBackgrounds);
+    range.setFontColors(sortedFontColors);
+    range.setHorizontalAlignment('center');
+    sheet.getRange(2, 5, rowCount, 11).setNumberFormat('0.00');
+
+    return {
+      success: true,
+      motor: motor || '',
+      sheetName: sheet.getName(),
+      rowCount: rowCount
+    };
+  } catch (error) {
+    return {
+      success: false,
+      sheetName: sheet ? sheet.getName() : '',
+      error: error.toString()
+    };
   }
 }
 
@@ -2218,8 +2645,9 @@ function getLastNormalRecordBefore(motor, tarih, saat) {
   if (!result.success || !result.data) return null;
 
   var limit = parseDateTimeTR(tarih, saat);
+  var searchMotor = normalizeEnerjiMotorLabel(motor);
   var records = result.data.filter(function(record) {
-    return String(record.motor || '').trim() === motor &&
+    return normalizeEnerjiMotorLabel(record.motor) === searchMotor &&
       String(record.durum || '').toUpperCase() === 'NORMAL' &&
       parseDateTimeTR(record.tarih, record.saat) < limit;
   });
@@ -2232,8 +2660,29 @@ function getLastNormalRecordBefore(motor, tarih, saat) {
 }
 
 function parseDateTimeTR(tarih, saat) {
+  if (Object.prototype.toString.call(tarih) === '[object Date]' && !isNaN(tarih.getTime())) {
+    var dateHourParts = String(saat || '00:00').split(':');
+    return new Date(
+      tarih.getFullYear(),
+      tarih.getMonth(),
+      tarih.getDate(),
+      parseInt(dateHourParts[0] || '0', 10),
+      parseInt(dateHourParts[1] || '0', 10)
+    );
+  }
+
   var text = String(tarih || '');
-  var parts = text.indexOf('-') !== -1 ? text.split('-').reverse() : text.split('.');
+  var parts;
+  if (text.indexOf('-') !== -1) {
+    parts = text.split('-').reverse();
+  } else if (text.indexOf('/') !== -1) {
+    var slashParts = text.split('/');
+    parts = slashParts[0].length === 4
+      ? [slashParts[2], slashParts[1], slashParts[0]]
+      : [slashParts[1], slashParts[0], slashParts[2]];
+  } else {
+    parts = text.split('.');
+  }
   var hourParts = String(saat || '00:00').split(':');
   return new Date(
     parseInt(parts[2], 10),
@@ -2250,45 +2699,77 @@ function pad2(value) {
 
 function colorizeDates(sheet, addedRecords) {
   try {
-    // Tarihleri grupla
+    if (!sheet || !addedRecords || !addedRecords.length) {
+      return { success: true, coloredCount: 0, dateCount: 0 };
+    }
+
     var dateGroups = {};
+    var rowTargets = {};
+    var keyTargets = {};
+
     for (var i = 0; i < addedRecords.length; i++) {
-      var record = addedRecords[i];
-      var tarih = record.tarih;
-      if (!dateGroups[tarih]) {
-        dateGroups[tarih] = [];
+      var record = addedRecords[i] || {};
+      var tarih = normalizeDateTR(record.tarih || '');
+      var saat = normalizeEnerjiSaat(record.saat || '');
+      if (!tarih) continue;
+
+      dateGroups[tarih] = true;
+      if (record.row) {
+        rowTargets[String(record.row)] = tarih;
       }
-      dateGroups[tarih].push(record.row);
-    }
-    
-    // Her tarih için rastgele renk atayıp boyala
-    for (var tarih in dateGroups) {
-      var rows = dateGroups[tarih];
-      var color = getRandomColor();
-      
-      for (var j = 0; j < rows.length; j++) {
-        var row = rows[j];
-        // Tüm satırı boyala (18 sütun)
-        var range = sheet.getRange(row, 1, 1, 18);
-        range.setBackground(color);
+      if (saat) {
+        keyTargets[tarih + '|' + saat] = tarih;
       }
     }
-    
-    console.log('🎨 Enerji tarihler renklendirildi: ' + Object.keys(dateGroups).length + ' farklı tarih');
+
+    var coloredCount = 0;
+    var lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      var rowCount = lastRow - 1;
+      var displayRows = sheet.getRange(2, 1, rowCount, 3).getDisplayValues();
+      var backgrounds = sheet.getRange(2, 1, rowCount, 18).getBackgrounds();
+
+      for (var rowIndex = 0; rowIndex < displayRows.length; rowIndex++) {
+        var sheetRow = rowIndex + 2;
+        var rowDate = normalizeDateTR(displayRows[rowIndex][0] || '');
+        var rowSaat = normalizeEnerjiSaat(displayRows[rowIndex][2] || '');
+        var targetDate = rowTargets[String(sheetRow)] || keyTargets[rowDate + '|' + rowSaat] || '';
+        if (!targetDate) continue;
+
+        var color = getDateColor(targetDate);
+        for (var col = 0; col < 18; col++) {
+          backgrounds[rowIndex][col] = color;
+        }
+        coloredCount++;
+      }
+
+      sheet.getRange(2, 1, rowCount, 18).setBackgrounds(backgrounds);
+    }
+
+    console.log('Enerji tarih renklendirme: ' + coloredCount + ' satir, ' + Object.keys(dateGroups).length + ' tarih');
+    return { success: true, coloredCount: coloredCount, dateCount: Object.keys(dateGroups).length };
   } catch (error) {
     console.error('Enerji renklendirme hatası: ' + error.toString());
+    return { success: false, error: error.toString() };
   }
 }
 
-// Rastgele pastel renk üret
-function getRandomColor() {
+function getDateColor(tarih) {
   var colors = [
-    '#FFB3BA', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF',
-    '#E2F0CB', '#B5EAD7', '#C7CEEA', '#F0E68C', '#DDA0DD',
-    '#98FB98', '#FFDAB9', '#E6E6FA', '#F0FFF0', '#FFF0F5',
-    '#FFE4E1', '#E0FFFF', '#F5F5DC', '#FFEFD5', '#FAEBD7'
+    '#e8f4ff', '#eaf7ea', '#fff4d6', '#f3e8ff', '#ffe8ef',
+    '#e7f7f7', '#f7efe7', '#eef2ff', '#f2f7e7', '#fff0e6'
   ];
-  return colors[Math.floor(Math.random() * colors.length)];
+  var text = normalizeDateTR(tarih || '');
+  var hash = 0;
+  for (var i = 0; i < text.length; i++) {
+    hash = ((hash * 31) + text.charCodeAt(i)) % colors.length;
+  }
+  return colors[Math.abs(hash) % colors.length];
+}
+
+// Geriye dönük uyumluluk için bırakıldı
+function getRandomColor() {
+  return getDateColor(Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy'));
 }
 
 // Mail gönderme fonksiyonu

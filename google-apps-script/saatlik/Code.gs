@@ -11,19 +11,19 @@
 
 // CORS ayarları
 function doGet(e) {
-  return handleRequest(e);
+  return saatlikHandleRequest(e);
 }
 
 function doPost(e) {
-  return handleRequest(e);
+  return saatlikHandleRequest(e);
 }
 
-function handleRequest(e) {
+function saatlikHandleRequest(e) {
   var params = (e && e.parameter) ? e.parameter : {};
   var action = params.action;
   var lock = null;
   try {
-    if (isWriteAction(action)) {
+    if (saatlikIsWriteAction(action)) {
       lock = LockService.getScriptLock();
       lock.waitLock(5000);
     }
@@ -32,46 +32,49 @@ function handleRequest(e) {
     
     switch(action) {
       case 'saveRecord':
-        result = saveRecord(params);
+        result = saatlikSaveRecord(params);
         break;
       case 'addRecord':
-        result = addRecord(params);
+        result = saatlikAddRecord(params);
         break;
       case 'updateRecord':
-        result = updateRecord(params);
+        result = saatlikUpdateRecord(params);
         break;
       case 'getRecords':
-        result = getRecords();
+        result = saatlikGetRecords();
         break;
       case 'getLastRecords':
-        result = getLastRecords(parseInt(params.count) || 48);
+        result = saatlikGetLastRecords(parseInt(params.count) || 48);
         break;
       case 'getRecordByDateTime':
-        result = getRecordByDateTime(params.tarih, params.saat);
+        result = saatlikGetRecordByDateTime(params.tarih, params.saat);
         break;
       case 'sendEmail':
-        result = sendEmailAlert(params);
+        result = saatlikSendEmailAlert(params);
         break;
       case 'checkHourlyMissingRecords':
-        result = checkHourlyMissingRecords();
+        result = saatlikCheckHourlyMissingRecords();
         break;
       case 'fillMissingRecordsForDate':
-        result = fillMissingRecordsForDate(params.tarih, params.startSaat, params.endSaat);
+        result = saatlikFillMissingRecordsForDate(params.tarih, params.startSaat, params.endSaat);
         break;
       case 'fillMissingRecordGaps':
-        result = fillMissingRecordGaps(params.tarih);
+        result = saatlikFillMissingRecordGaps(params.tarih);
+        break;
+      case 'fillMissingFullDay':
+        result = saatlikFillMissingFullDay(params.tarih, params.startSaat, params.endSaat);
         break;
       case 'installHourlyMissingRecordTrigger':
-        result = installHourlyMissingRecordTrigger();
+        result = saatlikInstallHourlyMissingRecordTrigger();
         break;
       case 'getTriggerHealth':
-        result = getTriggerHealth();
+        result = saatlikGetTriggerHealth();
         break;
       case 'getSystemLogs':
-        result = getSystemLogs(parseInt(params.count, 10) || 100);
+        result = saatlikGetSystemLogs(parseInt(params.count, 10) || 100);
         break;
       case 'addSystemLog':
-        result = addSystemLog(params);
+        result = saatlikAddSystemLog(params);
         break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
@@ -91,8 +94,8 @@ function handleRequest(e) {
   }
 }
 
-function isWriteAction(action) {
-  return ['saveRecord', 'addRecord', 'updateRecord', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingRecordsForDate', 'fillMissingRecordGaps', 'installHourlyMissingRecordTrigger', 'addSystemLog'].indexOf(action) !== -1;
+function saatlikIsWriteAction(action) {
+  return ['saveRecord', 'addRecord', 'updateRecord', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingRecordsForDate', 'fillMissingRecordGaps', 'fillMissingFullDay', 'installHourlyMissingRecordTrigger', 'addSystemLog'].indexOf(action) !== -1;
 }
 
 function getSaatlikSheet(createIfMissing) {
@@ -157,7 +160,7 @@ function findSaatlikRowByDateTime(sheet, tarih, saat) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return -1;
   var values = sheet.getRange(2, 2, lastRow - 1, 2).getDisplayValues();
-  var targetTarih = formatDateTR(tarih);
+  var targetTarih = saatlikFormatDateTR(tarih);
   var targetSaat = String(saat || '').trim();
   for (var i = 0; i < values.length; i++) {
     if (values[i][0] === targetTarih && String(values[i][1] || '').trim() === targetSaat) {
@@ -167,14 +170,14 @@ function findSaatlikRowByDateTime(sheet, tarih, saat) {
   return -1;
 }
 
-function saveRecord(data) {
+function saatlikSaveRecord(data) {
   var sheet = getSaatlikSheet(true);
   var foundRow = findSaatlikRowByDateTime(sheet, data.tarih, data.saat);
-  return foundRow === -1 ? addRecord(data) : updateRecord(data);
+  return foundRow === -1 ? saatlikAddRecord(data) : saatlikUpdateRecord(data);
 }
 
 // Yeni kayıt ekle
-function addRecord(data) {
+function saatlikAddRecord(data) {
   try {
     var sheet = getSaatlikSheet(true);
     
@@ -198,8 +201,8 @@ function addRecord(data) {
     }
     
     // Kayıt ekle
-    var kayitTarihi = formatDateTimeTR(new Date());
-    var formattedTarih = formatDateTR(data.tarih);
+    var kayitTarihi = saatlikFormatDateTimeTR(new Date());
+    var formattedTarih = saatlikFormatDateTR(data.tarih);
     
     var rowData = [
       nextID.toString(),
@@ -215,7 +218,7 @@ function addRecord(data) {
       data.notlar || '',
       kayitTarihi
     ];
-    var newRow = findInsertPosition(sheet, formattedTarih, data.saat);
+    var newRow = saatlikFindInsertPosition(sheet, formattedTarih, data.saat);
     if (newRow <= sheet.getLastRow()) {
       sheet.insertRowBefore(newRow);
     }
@@ -233,7 +236,7 @@ function addRecord(data) {
 }
 
 // Kayıt güncelle
-function updateRecord(data) {
+function saatlikUpdateRecord(data) {
   try {
     var sheet = getSaatlikSheet(false);
     
@@ -264,7 +267,7 @@ function updateRecord(data) {
     sheet.getRange(foundRow, 8).setValue(parseFloat(data.aydemReaktif) || 0);
     sheet.getRange(foundRow, 9).setValue(data.kaydeden || '');
     sheet.getRange(foundRow, 10).setValue(data.notlar || '');
-    sheet.getRange(foundRow, 11).setValue(formatDateTimeTR(new Date()));
+    sheet.getRange(foundRow, 11).setValue(saatlikFormatDateTimeTR(new Date()));
     
     Logger.log('Satır ' + foundRow + ' (ID: ' + recordID + ') güncellendi.');
     
@@ -276,7 +279,7 @@ function updateRecord(data) {
 }
 
 // Tüm kayıtları getir
-function getRecords() {
+function saatlikGetRecords() {
   try {
     var sheet = getSaatlikSheet(false);
     
@@ -304,7 +307,7 @@ function getRecords() {
 }
 
 // Son N kaydı getir
-function getLastRecords(count) {
+function saatlikGetLastRecords(count) {
   try {
     var sheet = getSaatlikSheet(false);
     if (!sheet) {
@@ -333,7 +336,7 @@ function getLastRecords(count) {
 }
 
 // Tarih ve saate göre kayıt getir
-function getRecordByDateTime(tarih, saat) {
+function saatlikGetRecordByDateTime(tarih, saat) {
   try {
     var sheet = getSaatlikSheet(false);
     if (!sheet) return { success: true, data: null, found: false };
@@ -353,10 +356,10 @@ function getRecordByDateTime(tarih, saat) {
 }
 
 // Tarih formatı (dd.MM.yyyy)
-function checkHourlyMissingRecords() {
+function saatlikCheckHourlyMissingRecords() {
   try {
     var now = new Date();
-    var target = getHourlyCheckTarget(now);
+    var target = saatlikGetHourlyCheckTarget(now);
     var tarih = target.tarih;
     var saat = target.saat;
     var sentKey = 'saatlikHourlyCheck:' + tarih + ':' + saat;
@@ -366,10 +369,10 @@ function checkHourlyMissingRecords() {
       return { success: true, skipped: true, message: 'Bu saat daha once kontrol edildi' };
     }
 
-    var existing = getRecordByDateTime(tarih, saat);
+    var existing = saatlikGetRecordByDateTime(tarih, saat);
     if (existing.success && existing.found) {
       props.setProperty(sentKey, new Date().toISOString());
-      addSystemLog({
+      saatlikAddSystemLog({
         tarih: tarih,
         saat: saat,
         modul: 'Saatlik Veri',
@@ -381,8 +384,8 @@ function checkHourlyMissingRecords() {
       return { success: true, missing: false, added: false, message: 'Kayit mevcut' };
     }
 
-    var vardiya = getVardiyaByHour(target.hour);
-    var addResult = addRecord({
+    var vardiya = saatlikGetVardiyaByHour(target.hour);
+    var addResult = saatlikAddRecord({
       tarih: tarih,
       saat: saat,
       vardiya: vardiya,
@@ -402,11 +405,11 @@ function checkHourlyMissingRecords() {
       'Bu saat icin saatlik veri girilmedi. Sistem otomatik bos kayit olusturdu.\n\n' +
       'Otomatik kayit sonucu: ' + (addResult.success ? 'Basarili' : addResult.error);
 
-    var mailResult = sendEmailAlert({ subject: subject, body: body });
+    var mailResult = saatlikSendEmailAlert({ subject: subject, body: body });
     if (addResult.success) {
       props.setProperty(sentKey, new Date().toISOString());
     }
-    addSystemLog({
+    saatlikAddSystemLog({
       tarih: tarih,
       saat: saat,
       modul: 'Saatlik Veri',
@@ -425,7 +428,7 @@ function checkHourlyMissingRecords() {
       mail: mailResult
     };
   } catch (error) {
-    addSystemLog({
+    saatlikAddSystemLog({
       modul: 'Saatlik Veri',
       otomatikKayitSonucu: 'Hata',
       mailSonucu: 'Bilinmiyor',
@@ -436,7 +439,7 @@ function checkHourlyMissingRecords() {
   }
 }
 
-function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
+function saatlikFillMissingRecordsForDate(tarih, startSaat, endSaat) {
   try {
     var sheet = getSaatlikSheet(false);
     if (!sheet || sheet.getLastRow() < 2) {
@@ -445,7 +448,7 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
       }
     }
 
-    var targetTarih = formatDateTR(tarih);
+    var targetTarih = saatlikFormatDateTR(tarih);
     if (!targetTarih) {
       return { success: false, error: 'Tarih zorunludur.' };
     }
@@ -459,14 +462,14 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
     for (var i = 0; i < rows.length; i++) {
       var record = mapSaatlikRow(rows[i]);
       if (String(record.tarih || '').trim() !== targetTarih) continue;
-      var hourValue = parseSaatLabel(record.saat);
+      var hourValue = saatlikParseSaatLabel(record.saat);
       if (hourValue === null) continue;
       existingByHour[hourValue] = true;
       hoursOnDate.push(hourValue);
     }
 
-    var startHour = startSaat ? parseSaatLabel(startSaat) : (hoursOnDate.length ? Math.min.apply(null, hoursOnDate) : null);
-    var endHour = endSaat ? parseSaatLabel(endSaat) : (hoursOnDate.length ? Math.max.apply(null, hoursOnDate) : null);
+    var startHour = startSaat ? saatlikParseSaatLabel(startSaat) : (hoursOnDate.length ? Math.min.apply(null, hoursOnDate) : null);
+    var endHour = endSaat ? saatlikParseSaatLabel(endSaat) : (hoursOnDate.length ? Math.max.apply(null, hoursOnDate) : null);
 
     if (startHour === null || endHour === null) {
       return { success: false, error: 'Bu tarihte mevcut kayit yoksa startSaat ve endSaat gonderin. Ornek: 08:00' };
@@ -482,15 +485,15 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
 
     for (var hour = startHour; hour <= endHour; hour++) {
       if (existingByHour[hour]) {
-        skipped.push(formatHourLabel(hour));
+        skipped.push(saatlikFormatHourLabel(hour));
         continue;
       }
 
-      var saat = formatHourLabel(hour);
-      var addResult = addRecord({
+      var saat = saatlikFormatHourLabel(hour);
+      var addResult = saatlikAddRecord({
         tarih: targetTarih,
         saat: saat,
-        vardiya: getVardiyaByHour(hour),
+        vardiya: saatlikGetVardiyaByHour(hour),
         aktifMwh: '0',
         reaktifMwh: '0',
         aydemAktif: '0',
@@ -506,7 +509,7 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
       }
     }
 
-    addSystemLog({
+    saatlikAddSystemLog({
       tarih: targetTarih,
       modul: 'Saatlik Veri',
       eksikKayit: added.join(', '),
@@ -519,8 +522,8 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
     return {
       success: true,
       tarih: targetTarih,
-      startSaat: formatHourLabel(startHour),
-      endSaat: formatHourLabel(endHour),
+      startSaat: saatlikFormatHourLabel(startHour),
+      endSaat: saatlikFormatHourLabel(endHour),
       addedCount: added.length,
       addedHours: added,
       skippedHours: skipped,
@@ -531,14 +534,14 @@ function fillMissingRecordsForDate(tarih, startSaat, endSaat) {
   }
 }
 
-function fillMissingRecordGaps(tarih) {
+function saatlikFillMissingRecordGaps(tarih) {
   try {
     var sheet = getSaatlikSheet(false);
     if (!sheet || sheet.getLastRow() < 2) {
       return { success: false, error: 'Saatlik veri sayfasi bos.' };
     }
 
-    var targetTarih = tarih ? formatDateTR(tarih) : '';
+    var targetTarih = tarih ? saatlikFormatDateTR(tarih) : '';
     var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 11).getDisplayValues();
     var hoursByDate = {};
     var allDates = [];
@@ -549,7 +552,7 @@ function fillMissingRecordGaps(tarih) {
       if (!recordTarih) continue;
       if (targetTarih && recordTarih !== targetTarih) continue;
 
-      var hourValue = parseSaatLabel(record.saat);
+      var hourValue = saatlikParseSaatLabel(record.saat);
       if (hourValue === null) continue;
 
       if (!hoursByDate[recordTarih]) {
@@ -570,7 +573,7 @@ function fillMissingRecordGaps(tarih) {
     }
 
     allDates.sort(function(a, b) {
-      return parseDateTimeTR(a, '00:00') - parseDateTimeTR(b, '00:00');
+      return saatlikParseDateTimeTR(a, '00:00') - saatlikParseDateTimeTR(b, '00:00');
     });
 
     var perDate = [];
@@ -597,15 +600,15 @@ function fillMissingRecordGaps(tarih) {
 
       for (var hour = startHour; hour <= endHour; hour++) {
         if (hourMap[hour]) {
-          skippedHours.push(formatHourLabel(hour));
+          skippedHours.push(saatlikFormatHourLabel(hour));
           totalSkipped++;
           continue;
         }
 
-        var addResult = addRecord({
+        var addResult = saatlikAddRecord({
           tarih: currentDate,
-          saat: formatHourLabel(hour),
-          vardiya: getVardiyaByHour(hour),
+          saat: saatlikFormatHourLabel(hour),
+          vardiya: saatlikGetVardiyaByHour(hour),
           aktifMwh: '0',
           reaktifMwh: '0',
           aydemAktif: '0',
@@ -615,19 +618,19 @@ function fillMissingRecordGaps(tarih) {
         });
 
         if (addResult.success) {
-          addedHours.push(formatHourLabel(hour));
+          addedHours.push(saatlikFormatHourLabel(hour));
           totalAdded++;
           hourMap[hour] = true;
         } else {
-          errors.push(formatHourLabel(hour) + ': ' + addResult.error);
-          allErrors.push(currentDate + ' ' + formatHourLabel(hour) + ': ' + addResult.error);
+          errors.push(saatlikFormatHourLabel(hour) + ': ' + addResult.error);
+          allErrors.push(currentDate + ' ' + saatlikFormatHourLabel(hour) + ': ' + addResult.error);
         }
       }
 
       perDate.push({
         tarih: currentDate,
-        baslangicSaat: formatHourLabel(startHour),
-        bitisSaat: formatHourLabel(endHour),
+        baslangicSaat: saatlikFormatHourLabel(startHour),
+        bitisSaat: saatlikFormatHourLabel(endHour),
         addedCount: addedHours.length,
         addedHours: addedHours,
         skippedCount: skippedHours.length,
@@ -636,7 +639,7 @@ function fillMissingRecordGaps(tarih) {
       });
     }
 
-    addSystemLog({
+    saatlikAddSystemLog({
       tarih: targetTarih || allDates[0],
       modul: 'Saatlik Veri',
       eksikKayit: totalAdded ? ('Toplam ' + totalAdded + ' saat dolduruldu') : 'Yok',
@@ -659,7 +662,130 @@ function fillMissingRecordGaps(tarih) {
   }
 }
 
-function getOrCreateSystemLogsSheet() {
+function saatlikFillMissingFullDay(tarih, startSaat, endSaat) {
+  try {
+    var sheet = getSaatlikSheet(false);
+    if (!sheet || sheet.getLastRow() < 2) {
+      return { success: false, error: 'Saatlik veri sayfasi bos.' };
+    }
+
+    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 11).getDisplayValues();
+    var targetTarih = tarih ? saatlikFormatDateTR(tarih) : '';
+    var dateMap = {};
+    var dates = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var record = mapSaatlikRow(rows[i]);
+      var recordTarih = String(record.tarih || '').trim();
+      if (!recordTarih) continue;
+      if (targetTarih && recordTarih !== targetTarih) continue;
+
+      var hourValue = saatlikParseSaatLabel(record.saat);
+      if (hourValue === null) continue;
+
+      if (!dateMap[recordTarih]) {
+        dateMap[recordTarih] = {};
+        dates.push(recordTarih);
+      }
+      dateMap[recordTarih][hourValue] = true;
+    }
+
+    if (!dates.length) {
+      return {
+        success: false,
+        error: targetTarih ? 'Bu tarihte kayit bulunamadi.' : 'Taranacak saatlik kayit bulunamadi.'
+      };
+    }
+
+    dates.sort(function(a, b) {
+      return saatlikParseDateTimeTR(a, '00:00') - saatlikParseDateTimeTR(b, '00:00');
+    });
+
+    var startHour = startSaat ? saatlikParseSaatLabel(startSaat) : 0;
+    var endHour = endSaat ? saatlikParseSaatLabel(endSaat) : 23;
+
+    if (startHour === null || endHour === null) {
+      return { success: false, error: 'Saat araligi hatali. Ornek: 00:00 - 23:00' };
+    }
+    if (endHour < startHour) {
+      return { success: false, error: 'Bitis saati baslangic saatinden kucuk olamaz.' };
+    }
+
+    var perDate = [];
+    var totalAdded = 0;
+    var allErrors = [];
+
+    for (var d = 0; d < dates.length; d++) {
+      var currentDate = dates[d];
+      var existingHours = dateMap[currentDate];
+      var addedHours = [];
+      var skippedHours = [];
+      var errors = [];
+
+      for (var hour = startHour; hour <= endHour; hour++) {
+        if (existingHours[hour]) {
+          skippedHours.push(saatlikFormatHourLabel(hour));
+          continue;
+        }
+
+        var addResult = saatlikAddRecord({
+          tarih: currentDate,
+          saat: saatlikFormatHourLabel(hour),
+          vardiya: saatlikGetVardiyaByHour(hour),
+          aktifMwh: '0',
+          reaktifMwh: '0',
+          aydemAktif: '0',
+          aydemReaktif: '0',
+          kaydeden: 'OTOMATIK SISTEM',
+          notlar: 'TUM GUN EKSIK SAAT - OTOMATIK'
+        });
+
+        if (addResult.success) {
+          addedHours.push(saatlikFormatHourLabel(hour));
+          existingHours[hour] = true;
+          totalAdded++;
+        } else {
+          var errorText = saatlikFormatHourLabel(hour) + ': ' + addResult.error;
+          errors.push(errorText);
+          allErrors.push(currentDate + ' ' + errorText);
+        }
+      }
+
+      perDate.push({
+        tarih: currentDate,
+        baslangicSaat: saatlikFormatHourLabel(startHour),
+        bitisSaat: saatlikFormatHourLabel(endHour),
+        addedCount: addedHours.length,
+        addedHours: addedHours,
+        skippedCount: skippedHours.length,
+        skippedHours: skippedHours,
+        errors: errors
+      });
+    }
+
+    saatlikAddSystemLog({
+      tarih: targetTarih || dates[0],
+      modul: 'Saatlik Veri',
+      eksikKayit: totalAdded ? ('Toplam ' + totalAdded + ' saat dolduruldu') : 'Yok',
+      otomatikKayitSonucu: totalAdded ? 'Tum gun eksik saat doldurma' : 'Gerekmedi',
+      mailSonucu: 'Gonderilmedi',
+      hataMesaji: allErrors.join('; '),
+      detay: targetTarih ? 'Tek tarih tum gun eksikleri dolduruldu' : 'Tum tarihlerde gun ici eksikler dolduruldu'
+    });
+
+    return {
+      success: true,
+      scannedDateCount: dates.length,
+      totalAddedCount: totalAdded,
+      dates: perDate,
+      errors: allErrors
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function saatlikGetOrCreateSystemLogsSheet() {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = spreadsheet.getSheetByName('SistemLoglari');
   var headers = ['Kayit Zamani', 'Tarih', 'Saat', 'Modul', 'Eksik Kayit', 'Otomatik Kayit Sonucu', 'Mail Sonucu', 'Hata Mesaji', 'Detay'];
@@ -675,12 +801,12 @@ function getOrCreateSystemLogsSheet() {
   return sheet;
 }
 
-function addSystemLog(data) {
+function saatlikAddSystemLog(data) {
   try {
-    var sheet = getOrCreateSystemLogsSheet();
+    var sheet = saatlikGetOrCreateSystemLogsSheet();
     sheet.appendRow([
-      formatDateTimeTR(new Date()),
-      formatDateTR(data.tarih || data.date || ''),
+      saatlikFormatDateTimeTR(new Date()),
+      saatlikFormatDateTR(data.tarih || data.date || ''),
       data.saat || data.hour || '',
       data.modul || data.module || 'Saatlik Veri',
       data.eksikKayit || data.missing || '',
@@ -695,9 +821,9 @@ function addSystemLog(data) {
   }
 }
 
-function getSystemLogs(count) {
+function saatlikGetSystemLogs(count) {
   try {
-    var sheet = getOrCreateSystemLogsSheet();
+    var sheet = saatlikGetOrCreateSystemLogsSheet();
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return { success: true, data: [] };
     var rowCount = Math.min(count || 100, lastRow - 1);
@@ -722,15 +848,16 @@ function getSystemLogs(count) {
   }
 }
 
-function installHourlyMissingRecordTrigger() {
+function saatlikInstallHourlyMissingRecordTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+    if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords' ||
+        triggers[i].getHandlerFunction() === 'saatlikCheckHourlyMissingRecords') {
       ScriptApp.deleteTrigger(triggers[i]);
     }
   }
 
-  ScriptApp.newTrigger('checkHourlyMissingRecords')
+  ScriptApp.newTrigger('saatlikCheckHourlyMissingRecords')
     .timeBased()
     .everyMinutes(5)
     .create();
@@ -738,12 +865,12 @@ function installHourlyMissingRecordTrigger() {
   return { success: true, message: 'Saatlik eksik kayit tetikleyicisi kuruldu' };
 }
 
-function getTriggerHealth() {
+function saatlikGetTriggerHealth() {
   try {
     var triggers = ScriptApp.getProjectTriggers();
     var hourlyTriggers = [];
     for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
+      if (triggers[i].getHandlerFunction() === 'saatlikCheckHourlyMissingRecords') {
         hourlyTriggers.push({
           handler: triggers[i].getHandlerFunction(),
           source: String(triggers[i].getTriggerSource()),
@@ -752,21 +879,21 @@ function getTriggerHealth() {
       }
     }
 
-    var logs = getSystemLogs(1);
+    var logs = saatlikGetSystemLogs(1);
     return {
       success: true,
       installed: hourlyTriggers.length > 0,
       triggerCount: hourlyTriggers.length,
       triggers: hourlyTriggers,
       lastLog: logs.success && logs.data.length ? logs.data[0] : null,
-      checkedAt: formatDateTimeTR(new Date())
+      checkedAt: saatlikFormatDateTimeTR(new Date())
     };
   } catch (error) {
     return { success: false, error: error.toString() };
   }
 }
 
-function getHourlyCheckTarget(date) {
+function saatlikGetHourlyCheckTarget(date) {
   var target = new Date(date);
   if (target.getMinutes() < 55) {
     target.setHours(target.getHours() - 1);
@@ -775,21 +902,21 @@ function getHourlyCheckTarget(date) {
   return {
     hour: target.getHours(),
     tarih: Utilities.formatDate(target, Session.getScriptTimeZone(), 'dd.MM.yyyy'),
-    saat: pad2(target.getHours()) + ':00'
+    saat: saatlikPad2(target.getHours()) + ':00'
   };
 }
 
-function getVardiyaByHour(hour) {
+function saatlikGetVardiyaByHour(hour) {
   if (hour >= 8 && hour < 16) return '08-16';
   if (hour >= 16 && hour < 24) return '16-24';
   return '24-08';
 }
 
-function pad2(value) {
+function saatlikPad2(value) {
   return String(value).padStart(2, '0');
 }
 
-function parseSaatLabel(value) {
+function saatlikParseSaatLabel(value) {
   var text = String(value || '').trim();
   if (!text) return null;
   var parts = text.split(':');
@@ -797,21 +924,21 @@ function parseSaatLabel(value) {
   return isNaN(hour) || hour < 0 || hour > 23 ? null : hour;
 }
 
-function formatHourLabel(hour) {
-  return pad2(hour) + ':00';
+function saatlikFormatHourLabel(hour) {
+  return saatlikPad2(hour) + ':00';
 }
 
-function findInsertPosition(sheet, tarih, saat) {
+function saatlikFindInsertPosition(sheet, tarih, saat) {
   var lastRow = sheet.getLastRow();
   if (lastRow <= 1) {
     return 2;
   }
 
-  var targetTime = parseDateTimeTR(tarih, saat).getTime();
+  var targetTime = saatlikParseDateTimeTR(tarih, saat).getTime();
   var data = sheet.getRange(2, 2, lastRow - 1, 2).getDisplayValues();
 
   for (var i = 0; i < data.length; i++) {
-    var rowTime = parseDateTimeTR(data[i][0], data[i][1]).getTime();
+    var rowTime = saatlikParseDateTimeTR(data[i][0], data[i][1]).getTime();
     if (rowTime > targetTime) {
       return i + 2;
     }
@@ -820,7 +947,7 @@ function findInsertPosition(sheet, tarih, saat) {
   return lastRow + 1;
 }
 
-function parseDateTimeTR(tarih, saat) {
+function saatlikParseDateTimeTR(tarih, saat) {
   var parts = String(tarih || '').indexOf('-') !== -1
     ? String(tarih || '').split('-').reverse()
     : String(tarih || '').split('.');
@@ -835,7 +962,7 @@ function parseDateTimeTR(tarih, saat) {
   );
 }
 
-function formatDateTR(dateString) {
+function saatlikFormatDateTR(dateString) {
   if (!dateString) return '';
   var parts = dateString.split('-');
   if (parts.length === 3) {
@@ -845,7 +972,7 @@ function formatDateTR(dateString) {
 }
 
 // Tarih-saat formatı (dd.MM.yyyy HH:mm:ss)
-function formatDateTimeTR(date) {
+function saatlikFormatDateTimeTR(date) {
   if (!date) return '';
   var d = new Date(date);
   var day = String(d.getDate()).padStart(2, '0');
@@ -858,7 +985,7 @@ function formatDateTimeTR(date) {
 }
 
 // 📧 Mail gönderme fonksiyonu
-function sendEmailAlert(data) {
+function saatlikSendEmailAlert(data) {
   try {
     // Parametreleri kontrol et
     if (!data) {

@@ -221,10 +221,6 @@ function getSaatDegeri(saat) {
 async function checkAndSendMissingEnerjiMail() {
     const now = new Date();
 
-    if (now.getMinutes() !== 59) {
-        return;
-    }
-
     const hour = String(now.getHours()).padStart(2, '0');
     const saat = `${hour}:00`;
     const day = String(now.getDate()).padStart(2, '0');
@@ -232,6 +228,22 @@ async function checkAndSendMissingEnerjiMail() {
     const year = now.getFullYear();
     const tarih = `${day}.${month}.${year}`;
     const sentKey = `kojenEnerjiMissingMailSent:${tarih}:${saat}`;
+
+    if (typeof runKojenEnerjiHourlyMissingRecordCheck === 'function') {
+        const serverResult = await runKojenEnerjiHourlyMissingRecordCheck();
+        if (serverResult.success) {
+            if ((serverResult.addedCount || 0) > 0) {
+                showMessage(`${serverResult.addedCount} otomatik kojen enerji kaydi olusturuldu.`, 'warning');
+                if (typeof loadVardiyaData === 'function') {
+                    await loadVardiyaData();
+                }
+            }
+            localStorage.setItem(sentKey, new Date().toISOString());
+            return;
+        }
+
+        console.error('Kojen enerji sunucu otomatik kayit kontrolu basarisiz:', serverResult.error);
+    }
 
     if (localStorage.getItem(sentKey)) {
         return;
@@ -284,7 +296,7 @@ function startMissingEnerjiMailCheck() {
 
     setInterval(() => {
         checkAndSendMissingEnerjiMail();
-    }, 60000);
+    }, 5 * 60 * 1000);
 
     setTimeout(() => {
         checkAndSendMissingEnerjiMail();

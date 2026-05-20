@@ -1480,10 +1480,6 @@ document.addEventListener('DOMContentLoaded', function() {
     async function checkAndSendMissingMotorMail() {
         const now = new Date();
 
-        if (now.getMinutes() !== 59) {
-            return;
-        }
-
         const hour = String(now.getHours()).padStart(2, '0');
         const saat = `${hour}:00`;
         const day = String(now.getDate()).padStart(2, '0');
@@ -1491,6 +1487,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const year = now.getFullYear();
         const tarih = `${day}.${month}.${year}`;
         const sentKey = `kojenMotorMissingMailSent:${tarih}:${saat}`;
+
+        if (typeof runKojenMotorHourlyMissingRecordCheck === 'function') {
+            const serverResult = await runKojenMotorHourlyMissingRecordCheck();
+            if (serverResult.success) {
+                if ((serverResult.addedCount || 0) > 0) {
+                    showMessage(`${serverResult.addedCount} otomatik kojen motor kaydi olusturuldu.`, 'warning');
+                    await loadVardiyaData();
+                }
+                localStorage.setItem(sentKey, new Date().toISOString());
+                return;
+            }
+
+            console.error('Kojen motor sunucu otomatik kayit kontrolu basarisiz:', serverResult.error);
+        }
 
         if (localStorage.getItem(sentKey)) {
             return;
@@ -1543,7 +1553,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setInterval(() => {
             checkAndSendMissingMotorMail();
-        }, 60000);
+        }, 5 * 60 * 1000);
 
         setTimeout(() => {
             checkAndSendMissingMotorMail();

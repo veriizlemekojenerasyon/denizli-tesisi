@@ -512,15 +512,10 @@ const GunlukApp = {
             return;
         }
         
-        // Sayı formatla, boş/NaN ise '-' göster, metin ise olduğu gibi göster
-        const formatNum = (val, digits = 3) => {
+        // Sayı değerini kayıttan geldiği gibi göster; yuvarlama yapma.
+        const formatNum = (val) => {
             if (!val || val === '' || val === '-') return '-';
-            // Eğer değer metin içeriyorsa (harf varsa), olduğu gibi göster
-            if (typeof val === 'string' && /[a-zA-ZğüşıöçĞÜŞİÖÇ]/.test(val)) {
-                return val;
-            }
-            const num = parseFloat(val);
-            return isNaN(num) ? (val || '-') : num.toFixed(digits);
+            return String(val);
         };
         
         let html = '';
@@ -533,16 +528,16 @@ const GunlukApp = {
                 <tr>
                     <td class="col-num">${index + 1}</td>
                     <td class="col-date">${record.tarih || '-'} ${aciklamaBadge}</td>
-                    <td class="col-oil">${formatNum(record.yagSeviyesi, 1)}</td>
-                    <td class="col-kuplaj">${formatNum(record.kuplaj, 3)}</td>
-                    <td class="col-gm">${formatNum(record.gm1, 3)}</td>
-                    <td class="col-gm">${formatNum(record.gm2, 3)}</td>
-                    <td class="col-gm">${formatNum(record.gm3, 3)}</td>
-                    <td class="col-consumption">${formatNum(record.icihtiyac, 3)}</td>
-                    <td class="col-redresor">${formatNum(record.redresor1, 3)}</td>
-                    <td class="col-redresor">${formatNum(record.redresor2, 3)}</td>
-                    <td class="col-kojen">${formatNum(record.kojenIcihtiyac, 3)}</td>
-                    <td class="col-consumption">${formatNum(record.servisTrafo, 3)}</td>
+                    <td class="col-oil">${formatNum(record.yagSeviyesi)}</td>
+                    <td class="col-kuplaj">${formatNum(record.kuplaj)}</td>
+                    <td class="col-gm">${formatNum(record.gm1)}</td>
+                    <td class="col-gm">${formatNum(record.gm2)}</td>
+                    <td class="col-gm">${formatNum(record.gm3)}</td>
+                    <td class="col-consumption">${formatNum(record.icihtiyac)}</td>
+                    <td class="col-redresor">${formatNum(record.redresor1)}</td>
+                    <td class="col-redresor">${formatNum(record.redresor2)}</td>
+                    <td class="col-kojen">${formatNum(record.kojenIcihtiyac)}</td>
+                    <td class="col-consumption">${formatNum(record.servisTrafo)}</td>
                 </tr>
             `;
         });
