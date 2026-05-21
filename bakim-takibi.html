@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bakım Takibi | Kojen Enerji Yönetim Sistemi</title>
     <link rel="stylesheet" href="css/bakim-takibi.css">
+    <link rel="stylesheet" href="css/bakim-takibi-modern.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         /* Sayfa yükleme animasyonu */
@@ -22,7 +23,6 @@
             scroll-behavior: smooth;
         }
     </style>
-    <link rel="stylesheet" href="css/mobile-system.css">
 </head>
 <body>
     <div class="dashboard-container">
@@ -356,7 +356,7 @@
                                         <option value="oil-sample">Yağ Numune Alma</option>
                                         <option value="oil-filter">Yağ Filtre Değişimi</option>
                                         <option value="heat-exchanger">Eşanjör Ölçümü</option>
-                                        <option value="ht-lt-jacket">HT LT Ceket Suyu Sıcaklık Ölçümü</option>
+                                        <option value="ht-lt-jacket">HT LT Ceket Suyu Deger Olcumu</option>
                                         <option value="other">Diğer</option>
                                     </select>
                                 </div>
@@ -386,6 +386,10 @@
                                 <h4>Alternatör Gresleme Ölçümleri</h4>
                                 <div class="alternator-measurements">
                                     <div class="measurement-row">
+                                        <div class="measurement-item">
+                                            <label for="alternator-motor-hours">Motor Calisma Saati</label>
+                                            <input type="number" id="alternator-motor-hours" name="alternator-motor-hours" step="1" min="0" placeholder="0">
+                                        </div>
                                         <div class="measurement-item">
                                             <label for="alternator-front">Ön (cm³)</label>
                                             <input type="number" id="alternator-front" name="alternator-front" step="0.1" min="0" placeholder="0.0">
@@ -432,20 +436,20 @@
                                 </div>
                             </div>
                             <div class="form-group full-width" id="ht-lt-jacket-fields" style="display: none;">
-                                <h4>HT LT Ceket Suyu Sıcaklık Ölçümleri</h4>
+                                <h4>HT LT Ceket Suyu Degerleri</h4>
                                 <div class="ht-lt-jacket-info">
                                     <div class="ht-lt-jacket-row">
                                         <div class="ht-lt-jacket-item">
-                                            <label for="ht-temperature">HT Sıcaklık (°C)</label>
-                                            <input type="number" id="ht-temperature" name="ht-temperature" step="0.1" min="0" placeholder="0.0">
+                                            <label for="ht-temperature">HT Deger</label>
+                                            <input type="number" id="ht-temperature" name="ht-temperature" step="0.1" placeholder="0.0">
                                         </div>
                                         <div class="ht-lt-jacket-item">
-                                            <label for="lt-temperature">LT Sıcaklık (°C)</label>
-                                            <input type="number" id="lt-temperature" name="lt-temperature" step="0.1" min="0" placeholder="0.0">
+                                            <label for="lt-temperature">LT Deger</label>
+                                            <input type="number" id="lt-temperature" name="lt-temperature" step="0.1" placeholder="0.0">
                                         </div>
                                         <div class="ht-lt-jacket-item">
-                                            <label for="jacket-temperature">Ceket Suyu Sıcaklık (°C)</label>
-                                            <input type="number" id="jacket-temperature" name="jacket-temperature" step="0.1" min="0" placeholder="0.0">
+                                            <label for="jacket-temperature">Ceket Suyu Deger</label>
+                                            <input type="number" id="jacket-temperature" name="jacket-temperature" step="0.1" placeholder="0.0">
                                         </div>
                                     </div>
                                 </div>
@@ -747,11 +751,7 @@
             } catch (e) { window.location.href = 'anasayfa.html'; return; }
         })();
     </script>
+    <script src="js/bakim-takibi-redesign.js"></script>
     <script src="js/bakim-takibi.js"></script>
-    <script src="js/global-duyurular.js"></script>
-    <script src="js/auto-refresh.js"></script>
-    <script src="js/admin-menu-visibility.js"></script>
-    <script src="js/logout-system.js"></script>
 </body>
 </html>
-

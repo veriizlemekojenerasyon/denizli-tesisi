@@ -1,0 +1,825 @@
+/* Modern maintenance workspace overrides. Header/sidebar stay from the base theme. */
+
+:root {
+  --maint-bg: #f6f8fb;
+  --maint-panel: #ffffff;
+  --maint-border: #d9e2ec;
+  --maint-text: #152033;
+  --maint-muted: #64748b;
+  --maint-primary: #2563eb;
+  --maint-primary-dark: #1d4ed8;
+  --maint-success: #16a34a;
+  --maint-danger: #dc2626;
+}
+
+.dashboard-content {
+  background: var(--maint-bg);
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+}
+
+.dashboard-content::before {
+  content: "Bakim is istasyonu";
+  display: block;
+  padding: 10px 2px 0;
+  color: var(--maint-text);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.top-dashboard-row {
+  display: contents !important;
+}
+
+.stats-panel,
+.chart-panel,
+.maintenance-container,
+.report-panel,
+.active-records-panel {
+  border: 1px solid var(--maint-border) !important;
+  border-radius: 8px !important;
+  background: var(--maint-panel) !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+.stats-panel,
+.chart-panel,
+.maintenance-container,
+.report-panel {
+  padding: 16px;
+}
+
+.stats-panel {
+  order: 1;
+}
+
+.main-content-area {
+  order: 2;
+}
+
+.chart-panel {
+  order: 4;
+}
+
+.stats-panel h2,
+.chart-header h2,
+.form-selector h2,
+.maintenance-form h3,
+.report-panel h2,
+.report-table-container h3,
+.active-records-panel h3 {
+  color: var(--maint-text);
+  font-size: 1rem;
+  line-height: 1.25;
+  margin: 0 0 12px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.stat-card {
+  min-height: 78px;
+  padding: 12px !important;
+  border: 1px solid var(--maint-border);
+  border-radius: 8px !important;
+  background: #fbfdff !important;
+  box-shadow: none !important;
+}
+
+.stat-card-overdue {
+  grid-column: auto;
+}
+
+.stat-icon {
+  display: none !important;
+}
+
+.stat-number {
+  color: var(--maint-text);
+  font-size: 1.55rem !important;
+  font-weight: 700;
+}
+
+.stat-label,
+.summary-label,
+.control-group label,
+.form-group label,
+.measurement-item label,
+.oil-sample-item label,
+.oil-filter-item label,
+.ht-lt-jacket-item label {
+  color: var(--maint-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.chart-header,
+.chart-footer,
+.report-controls,
+.table-controls,
+.active-records-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chart-controls,
+.form-buttons {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.form-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.chart-btn,
+.form-btn {
+  min-height: 36px;
+  border: 0 !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  color: var(--maint-muted) !important;
+  background: transparent !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.form-btn {
+  text-align: center;
+}
+
+.chart-btn.active,
+.form-btn.active {
+  color: #ffffff !important;
+  background: var(--maint-primary) !important;
+}
+
+.main-content-area {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.forms-section,
+.reports-section {
+  min-width: 0;
+}
+
+.forms-section {
+  position: static;
+}
+
+.reports-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-selector {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--maint-border);
+}
+
+.form-selector h2 {
+  align-self: center;
+  margin: 0;
+}
+
+.maintenance-workbench-header {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.45fr) minmax(360px, 0.55fr);
+  gap: 14px;
+  align-items: start;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--maint-border);
+}
+
+.section-kicker {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--maint-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.maintenance-workbench-header h2 {
+  margin: 0;
+  color: var(--maint-text);
+  font-size: 1.15rem;
+}
+
+.modern-record-form {
+  border: 0;
+}
+
+.record-form-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.record-form-title h3 {
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--maint-text);
+  font-size: 1rem;
+}
+
+.record-type-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.record-type-danger {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.form-step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.step-label {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--maint-primary);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.step-body {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.step-body h4 {
+  margin: 0 0 10px;
+  color: var(--maint-text);
+  font-size: 0.94rem;
+}
+
+.conditional-fields-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.conditional-fields-grid > div {
+  margin: 0;
+}
+
+.maintenance-form-content {
+  display: grid;
+  gap: 12px;
+}
+
+.maintenance-form {
+  animation: maintenancePanelIn 0.18s ease-out;
+}
+
+@keyframes maintenancePanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-row,
+.measurement-row,
+.oil-sample-row,
+.oil-filter-row,
+.ht-lt-jacket-row {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.measurement-row,
+.ht-lt-jacket-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.oil-sample-row,
+.oil-filter-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-group,
+.measurement-item,
+.oil-sample-item,
+.oil-filter-item,
+.ht-lt-jacket-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.maintenance-form h3 {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eef6ff;
+  color: #12325f;
+}
+
+input,
+select,
+textarea {
+  min-height: 38px;
+  border: 1px solid var(--maint-border) !important;
+  border-radius: 7px !important;
+  background: #ffffff;
+  color: var(--maint-text);
+  font: inherit;
+  padding: 9px 10px !important;
+}
+
+textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  border-color: var(--maint-primary) !important;
+}
+
+.technician-input-group {
+  display: grid !important;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+  box-sizing: border-box;
+}
+
+.technician-input-group select {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+}
+
+#periodic-technician,
+#normal-technician,
+#fault-technician {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+#periodic-external-company,
+#normal-external-company,
+#fault-external-company {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#periodic-technician-company,
+#normal-technician-company,
+#fault-technician-company {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+#periodic-technician,
+#normal-technician,
+#fault-technician {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#alternator-grease-fields,
+#oil-sample-fields,
+#oil-filter-fields,
+#ht-lt-jacket-fields {
+  padding: 12px;
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+#alternator-grease-fields[style*="block"],
+#oil-sample-fields[style*="block"],
+#oil-filter-fields[style*="block"],
+#ht-lt-jacket-fields[style*="block"] {
+  display: block !important;
+}
+
+#alternator-grease-fields h4,
+#oil-sample-fields h4,
+#oil-filter-fields h4,
+#ht-lt-jacket-fields h4 {
+  margin: 0 0 10px;
+  color: var(--maint-text);
+  font-size: 0.95rem;
+}
+
+.file-upload-container {
+  border: 1px dashed #9db0c7;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.file-upload-area {
+  min-height: 86px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px !important;
+}
+
+.file-upload-icon {
+  display: none;
+}
+
+.file-upload-text {
+  margin: 0;
+  color: var(--maint-muted);
+  font-weight: 600;
+}
+
+.file-list {
+  padding: 0 12px 12px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.btn {
+  min-height: 38px;
+  border-radius: 7px !important;
+  border: 0 !important;
+  padding: 9px 14px !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: var(--maint-primary) !important;
+  color: #ffffff !important;
+}
+
+.btn-primary:hover {
+  background: var(--maint-primary-dark) !important;
+}
+
+.btn-secondary {
+  background: #e2e8f0 !important;
+  color: var(--maint-text) !important;
+}
+
+.report-controls {
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.report-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.report-panel > h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.report-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.active-records-panel {
+  order: 1;
+  padding: 16px !important;
+}
+
+.report-summary {
+  order: 2;
+  max-width: 100%;
+}
+
+.report-table-container {
+  order: 3;
+}
+
+.active-records-panel h3 {
+  margin-bottom: 4px;
+}
+
+.active-records-panel {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.active-records-controls select,
+.active-records-controls button {
+  min-height: 38px;
+}
+
+.active-records-controls {
+  display: grid !important;
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+  align-items: end;
+}
+
+.report-summary {
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.report-table-container {
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.chart-panel {
+  margin-top: 0;
+}
+
+.chart-container {
+  min-height: 260px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group:last-child {
+  flex-direction: row;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.summary-item {
+  padding: 10px;
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.summary-value {
+  display: block;
+  margin-top: 4px;
+  color: var(--maint-text);
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.table-wrapper {
+  border: 1px solid var(--maint-border);
+  border-radius: 8px;
+  max-width: 100%;
+  overflow: auto;
+}
+
+.maintenance-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.maintenance-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #eef3f8 !important;
+  color: var(--maint-text);
+  font-size: 0.78rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+#active-records-table {
+  table-layout: fixed;
+  min-width: 680px;
+}
+
+#active-records-table th:nth-child(1),
+#active-records-table td:nth-child(1) {
+  width: 110px;
+}
+
+#active-records-table th:nth-child(2),
+#active-records-table td:nth-child(2) {
+  width: 92px;
+}
+
+#active-records-table th:nth-child(3),
+#active-records-table td:nth-child(3) {
+  width: 70px;
+}
+
+#active-records-table th:nth-child(4),
+#active-records-table td:nth-child(4) {
+  width: 90px;
+}
+
+#active-records-table th:nth-child(5),
+#active-records-table td:nth-child(5) {
+  width: 150px;
+}
+
+#active-records-table th:nth-child(6),
+#active-records-table td:nth-child(6) {
+  width: 90px;
+}
+
+#active-records-table th:nth-child(7),
+#active-records-table td:nth-child(7) {
+  width: 88px;
+  text-align: center;
+}
+
+#active-records-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.maintenance-table th,
+.maintenance-table td {
+  padding: 8px 10px !important;
+  border-bottom: 1px solid var(--maint-border) !important;
+}
+
+.maintenance-table td {
+  color: #334155;
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.report-table-container,
+.active-records-panel {
+  margin-top: 16px !important;
+}
+
+.active-records-panel p {
+  color: var(--maint-muted) !important;
+  margin: 0 0 12px !important;
+}
+
+@media (max-width: 1180px) {
+  .top-dashboard-row,
+  .main-content-area,
+  .report-results {
+    grid-template-columns: 1fr;
+  }
+
+  .forms-section {
+    position: static;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .maintenance-workbench-header {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-content {
+    padding: 12px;
+  }
+
+  .stats-grid,
+  .summary-grid,
+  .form-row,
+  .measurement-row,
+  .oil-sample-row,
+  .oil-filter-row,
+  .ht-lt-jacket-row,
+  .technician-input-group {
+    grid-template-columns: 1fr !important;
+  }
+
+  .active-records-controls {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stat-card-overdue {
+    grid-column: auto;
+  }
+
+  .form-selector,
+  .maintenance-workbench-header,
+  .chart-header,
+  .chart-footer,
+  .report-controls,
+  .table-controls,
+  .active-records-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .form-selector {
+    display: flex;
+  }
+
+  .maintenance-workbench-header,
+  .form-step {
+    grid-template-columns: 1fr;
+  }
+
+  .step-label {
+    width: 28px;
+    height: 28px;
+  }
+
+  .form-buttons,
+  .chart-controls,
+  .control-group:last-child {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn,
+  .chart-btn,
+  .form-btn {
+    width: 100%;
+  }
+}

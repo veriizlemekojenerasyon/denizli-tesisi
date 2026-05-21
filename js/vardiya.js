@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Vardiya Google Apps Script URL
     const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4xRMYihfe_73NI-wMCvioTG6PrZilWAIBdA0n7dbJl6Nq9oJ-Va6IL-60_9OMNX3P/exec';
     const VARDIYA_CONTROL_URLS = {
-        saatlik: 'https://script.google.com/macros/s/AKfycbxKo1fwJBYHGNbrrIW5agfYkAqLSj8nVbKzbi2OXoeTLM7oZLyfNSMqQP-uGIsDQp5y/exec',
+        saatlik: 'https://script.google.com/macros/s/AKfycbzzpkF4RJJ46d9A9518oxSwGaeuSgw-VHodQ5hjCApqb1H0FuIEnYNsqGOSdWXf9Yc/exec',
         motor: 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec',
         enerji: 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec',
         bildirim: 'https://script.google.com/macros/s/AKfycbz9uR24xQeuV85ygxfFiakRRJz601KgaKCgOlHcsuYDjUl5xkR4o3HbIVn-tgVdSnTF/exec'

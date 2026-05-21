@@ -39,8 +39,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec';
     const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec';
     const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec';
-    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgjdH1kftdCxqrcUFwWMWSX7j6t0XAKVThgQjUVkwA8BlpzA5GS5VH3-ln3LP8c6NolQ/exec';
-    const SAATLIK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKo1fwJBYHGNbrrIW5agfYkAqLSj8nVbKzbi2OXoeTLM7oZLyfNSMqQP-uGIsDQp5y/exec';
+    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzXXjRobF1VwVAwKEj7AE0JFE4bWYUXsgwaOwWFXJbxZ0EE0OE7GAuKaQQU3t6x6RUm/exec';
+    const SAATLIK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzpkF4RJJ46d9A9518oxSwGaeuSgw-VHodQ5hjCApqb1H0FuIEnYNsqGOSdWXf9Yc/exec';
     const GUNLUK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNka_9UemxV0HPBVA02qUE2ayzICY4OH0Ms3uBx4VupMB-4UZlnvNhCoeV6SRzkAFy/exec';
     const ADMIN_TRIGGER_MODULES = [
         { key: 'saatlik', label: 'Saatlik Veri', url: SAATLIK_APPS_SCRIPT_URL },

@@ -1,57 +1,125 @@
-// Bakım Takibi Google Apps Script
-// Sheet ID ve Sheet Name olmadan dinamik çalışır
+// Bakim Takip Sistemi - Google Apps Script V2
+// Ortak kayit modeli + tur/motor bazli Sheets yapisi.
 
-// Global değişkenler - Kullanıcı linkleri
-const SPREADSHEET_NAME = "Bakım Takip Sistemi";
-const SPREADSHEET_ID = "1226RpbRSRp4ryBgUVxw69wPwcmJq0wHQ0OafEHqnuoo"; // Kullanıcı Sheets ID
+const SPREADSHEET_NAME = 'Bakim Takip Sistemi';
+const SPREADSHEET_ID = '1ep4yY5U_QRghohq6DtkbG68KT8MMFLVMXe6S7atd2AQ';
+const KOJEN_ENERJI_API_URL = 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec';
+
 const DRIVE_FOLDERS = {
-  PERIODIC: "1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9", // Periyodik Bakım Drive ID
-  NORMAL: "10D4LgnGYN0TMdweTIfeMjoKSX2ZLaYCA",   // Normal Bakım Drive ID  
-  FAULT: "1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9"     // Arıza Bakım Drive ID (Periyodik ile aynı)
+  PERIODIC: '1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9',
+  NORMAL: '10D4LgnGYN0TMdweTIfeMjoKSX2ZLaYCA',
+  FAULT: '1TGrKfYHrayZmiGW1J8GQd70jPtByBKY9'
 };
 
-const KOJEN_ENERJI_API_URL = "https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec";
+const MOTORS = ['GM-1', 'GM-2', 'GM-3'];
+const SHEET_STATS = 'Istatistikler';
+const SHEET_SETTINGS = 'Ayarlar';
+const DEFAULT_ALERT_EMAIL = 'mrtcsk0320@gmail.com';
+const ALERT_EMAIL_PROPERTY = 'BAKIM_ALERT_EMAIL';
+const MAINTENANCE_LAST_RUN_PROPERTY = 'BAKIM_LAST_TRIGGER_RUN';
+const MAINTENANCE_LAST_ERROR_PROPERTY = 'BAKIM_LAST_TRIGGER_ERROR';
+const ENABLE_PUBLIC_FILE_SHARING = false;
+
+const PERIODIC_BASE_HOURS = 40000;
+const PERIODIC_STEP_HOURS = 2000;
+const PERIODIC_WARNING_HOURS = 200;
+const PERIODIC_URGENT_WARNING_HOURS = 100;
+const PERIODIC_INTERVALS = [30000, 20000, 10000, 6000, 2000];
+
 const OIL_SAMPLE_INTERVAL_HOURS = 500;
-const OIL_SAMPLE_WARNING_HOURS = 400;
+const OIL_SAMPLE_WARNING_HOURS = 100;
+const OIL_SAMPLE_URGENT_WARNING_HOURS = 50;
 const ALTERNATOR_GREASE_INTERVAL_HOURS = 1000;
-const ALTERNATOR_GREASE_WARNING_HOURS = 900;
+const ALTERNATOR_GREASE_WARNING_HOURS = 100;
 
-const SHEET_NAMES = {
-  PERIODIC_MAINTENANCE: "Periyodik Bakım Kayıtları",
-  NORMAL_MAINTENANCE: "Normal Bakım Kayıtları", 
-  FAULT_MAINTENANCE: "Arıza Bakım Kayıtları",
-  STATISTICS: "İstatistikler",
-  SETTINGS: "Ayarlar",
-  MOTOR_HOURS: "Motor Saatleri"
+const COMMON_RECORD_HEADERS = [
+  'Kayit No',
+  'Tarih',
+  'Saat',
+  'Motor',
+  'Bakim Ana Turu',
+  'Bakim Alt Turu',
+  'Destek Tipi',
+  'Sorumlu',
+  'Durum',
+  'Aciklama',
+  'Dosyalar',
+  'Kayit Zamani',
+  'Kapama Zamani',
+  'Guncel Motor Saati',
+  'Baslangic Tarihi',
+  'Baslangic Saati',
+  'Bitis Tarihi',
+  'Bitis Saati'
+];
+
+const SHEET_EXTRA_HEADERS = {
+  periodic: ['Periyodik Son Esik', 'Periyodik Sonraki Esik', 'Kalan Saat', 'Bildirim Durumu', 'Plan Detayi'],
+  oilSample: ['Barkod No'],
+  oilFilter: ['Yag Calisma Saati'],
+  oilChange: ['Yag Calisma Saati'],
+  htLtJacket: ['HT Deger', 'LT Deger', 'Ceket Suyu Deger'],
+  alternator: ['Alternator On', 'Alternator Arka', 'Alternator Toplam'],
+  fault: ['Ariza Saati', 'Ariza Nedeni'],
+  other: []
 };
 
-// Ana doPost fonksiyonu
+function doGet(e) {
+  return handleRequest(e);
+}
+
 function doPost(e) {
+  return handleRequest(e);
+}
+
+function handleRequest(e) {
   try {
-    // e veya e.parameters undefined ise varsayılan değerler kullan
-    if (!e) {
-      Logger.log('UYARI: e parametresi undefined, test modu');
-      e = { parameters: {} };
-    }
-    
-    if (!e.parameters) {
-      Logger.log('UYARI: e.parameters undefined, boş obje oluşturuluyor');
-      e.parameters = {};
-    }
-    
-    const params = e.parameters;
-    // params.action bir array olduğu için ilk elemanı al
-    const action = (params.action && params.action[0]) || 'save';
-    
-    Logger.log('İşlem: ' + action);
-    Logger.log('Parametreler: ' + JSON.stringify(params));
-    
-    // Spreadsheet'i oluştur veya al
-    const ss = getOrCreateSpreadsheet();
-    
-    switch(action) {
+    const params = normalizeEventParams(e);
+    const action = getParam(params, 'action') || 'health';
+    const ss = getSpreadsheet();
+    if (shouldEnsureWorkbookForAction(action)) ensureWorkbook(ss);
+
+    switch (action) {
+      case 'health':
+      case 'test':
+        return jsonResponse(true, 'Bakim Takip V2 calisiyor', {
+          version: '2.0',
+          sheets: getSheetDefinitions().map(function(item) { return item.name; })
+        });
+      case 'init':
+        return jsonResponse(true, 'Sayfalar hazirlandi', {
+          sheets: getSheetDefinitions().map(function(item) { return item.name; })
+        });
+      case 'resetSheetHeaders':
+        return resetSheetHeaders(ss);
+      case 'testDriveAccess':
+      case 'testDriveFolders':
+        return testDriveAccess();
       case 'save':
-        return saveMaintenanceRecord(ss, params);
+        return saveMaintenanceRecordV2(ss, params);
+      case 'savePeriodicMaintenanceV2':
+        params.type = ['Periyodik'];
+        return saveMaintenanceRecordV2(ss, params);
+      case 'getPeriodicMaintenanceStatus':
+        return getPeriodicMaintenanceStatus(ss);
+      case 'checkPeriodicMaintenanceAlerts':
+        return getPeriodicMaintenanceStatus(ss);
+      case 'getMotorHours':
+        return getMotorHours(ss);
+      case 'checkOilSampleAlerts':
+        return checkOilSampleAlerts(ss);
+      case 'checkAlternatorGreaseAlerts':
+        return checkAlternatorGreaseAlerts(ss);
+      case 'runMaintenanceCheck':
+        return runMaintenanceCheck();
+      case 'updateSettingsMotorHours':
+        return updateSettingsMotorHours(ss);
+      case 'installMaintenanceTriggers':
+        return installMaintenanceTriggers();
+      case 'removeMaintenanceTriggers':
+        return removeMaintenanceTriggers();
+      case 'getMaintenanceTriggers':
+        return getMaintenanceTriggers();
       case 'getStats':
         return getMaintenanceStats(ss, params);
       case 'getReport':
@@ -60,2082 +128,1486 @@ function doPost(e) {
         return getActiveRecords(ss, params);
       case 'closeRecord':
         return closeRecord(ss, params);
-      case 'getMotorHours':
-        return getMotorHoursV2(ss);
       case 'updateMotorHours':
-        return updateMotorHours(ss, params);
+        return jsonResponse(true, 'Motor saati Enerji sayfasindan otomatik okunuyor');
       case 'updateOilSample':
-        return updateOilSample(ss, params);
+        return createQuickMaintenanceRecord(ss, params, 'Normal', 'YAG NUMUNE ALMA');
       case 'updateAlternatorGrease':
-        return updateAlternatorGrease(ss, params);
-      case 'init':
-        return initializeSystem(ss);
-      case 'test':
-        return testConnection(ss);
+        return createQuickMaintenanceRecord(ss, params, 'Normal', 'ALTERNATOR GRESLEME');
       default:
-        Logger.log('Geçersiz işlem: ' + action);
-        return createResponse(false, "Geçersiz işlem: " + action);
+        return jsonResponse(false, 'Gecersiz islem: ' + action);
     }
   } catch (error) {
-    Logger.log('HATA: ' + error.toString());
-    Logger.log('Stack: ' + error.stack);
-    return createResponse(false, "Sistem hatası: " + error.toString());
+    Logger.log('Sistem hatasi: ' + error.toString());
+    Logger.log(error.stack || '');
+    return jsonResponse(false, 'Sistem hatasi: ' + error.toString());
   }
 }
 
-// GET istekleri için doGet fonksiyonu
-function doGet(e) {
-  Logger.log('GET isteği alındı');
-  if (!e) {
-    Logger.log('UYARI: GET isteğinde e parametresi undefined');
-    e = { parameter: {} };
-  }
-  return doPost(e);
+function shouldEnsureWorkbookForAction(action) {
+  return ['init', 'resetSheetHeaders', 'installMaintenanceTriggers', 'runMaintenanceCheck'].indexOf(action) !== -1;
 }
 
-// Spreadsheet'i oluştur veya mevcut olanı al
-function getOrCreateSpreadsheet() {
-  try {
-    // Kullanıcının mevcut spreadsheet'ini kullan
-    if (SPREADSHEET_ID) {
-      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      Logger.log('Mevcut spreadsheet kullanılıyor: ' + SPREADSHEET_ID);
-      
-      // Sayfaları kontrol et ve gerekirse oluştur
-      createSheets(ss);
-      
-      return ss;
-    }
-    
-    // Eğer ID yoksa, isimle ara
-    const files = DriveApp.getFilesByName(SPREADSHEET_NAME);
-    
-    if (files.hasNext()) {
-      // Mevcut spreadsheet'i kullan
-      const file = files.next();
-      const ss = SpreadsheetApp.openById(file.getId());
-      Logger.log('Mevcut spreadsheet bulundu: ' + file.getId());
-      
-      createSheets(ss);
-      return ss;
-    } else {
-      // Yeni spreadsheet oluştur
-      const ss = SpreadsheetApp.create(SPREADSHEET_NAME);
-      Logger.log('Yeni spreadsheet oluşturuldu: ' + ss.getId());
-      
-      // Sayfaları oluştur
-      createSheets(ss);
-      
-      // Paylaşım ayarları (isteğe bağlı)
-      ss.addEditor(Session.getActiveUser().getEmail());
-      
-      return ss;
-    }
-  } catch (error) {
-    throw new Error('Spreadsheet oluşturulamadı: ' + error.toString());
+function normalizeEventParams(e) {
+  if (!e) return {};
+  if (e.parameters) return e.parameters;
+  if (e.parameter) {
+    const out = {};
+    Object.keys(e.parameter).forEach(function(key) {
+      out[key] = [e.parameter[key]];
+    });
+    return out;
   }
+  return {};
 }
 
-// Sayfaları oluştur
-function createSheets(ss) {
-  // Her bakım türü için ayrı sayfalar oluştur
-  const maintenanceSheets = [
-    { name: SHEET_NAMES.PERIODIC_MAINTENANCE, title: 'Periyodik Bakım Kayıtları' },
-    { name: SHEET_NAMES.NORMAL_MAINTENANCE, title: 'Normal Bakım Kayıtları' },
-    { name: SHEET_NAMES.FAULT_MAINTENANCE, title: 'Arıza Bakım Kayıtları' }
-  ];
-  
-  maintenanceSheets.forEach(sheetInfo => {
-    createMaintenanceSheet(ss, sheetInfo.name, sheetInfo.title);
+function getParam(params, key) {
+  const value = params[key];
+  if (Array.isArray(value)) return value[0] || '';
+  if (value === null || typeof value === 'undefined') return '';
+  return String(value);
+}
+
+function getSpreadsheet() {
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+
+  const files = DriveApp.getFilesByName(SPREADSHEET_NAME);
+  if (files.hasNext()) return SpreadsheetApp.openById(files.next().getId());
+  return SpreadsheetApp.create(SPREADSHEET_NAME);
+}
+
+function ensureWorkbook(ss) {
+  getSheetDefinitions().forEach(function(definition) {
+    ensureRecordSheet(ss, definition.name);
+  });
+  ensureStatsSheet(ss);
+  ensureSettingsSheet(ss);
+}
+
+function resetSheetHeaders(ss) {
+  const sheets = getSheetDefinitions().map(function(definition) {
+    const sheet = ensureRecordSheet(ss, definition.name);
+    const headers = getHeadersForSheet(definition.name);
+    return {
+      sheetName: definition.name,
+      columnCount: headers.length,
+      headers: headers
+    };
+  });
+
+  return jsonResponse(true, 'Sayfa basliklari yenilendi', { sheets: sheets });
+}
+
+function getSheetDefinitions() {
+  const sheets = [];
+  MOTORS.forEach(function(motor) {
+    sheets.push({ name: 'Periyodik ' + motor, mainType: 'Periyodik' });
+    sheets.push({ name: 'Yag Numune ' + motor, mainType: 'Normal' });
+    sheets.push({ name: 'Yag Filtre Degisimi ' + motor, mainType: 'Normal' });
+    sheets.push({ name: 'Yag Degisimi ' + motor, mainType: 'Normal' });
+    sheets.push({ name: 'HT LT Ceket Suyu ' + motor, mainType: 'Normal' });
+    sheets.push({ name: 'Alternator Gresleme ' + motor, mainType: 'Normal' });
+    sheets.push({ name: 'Ariza ' + motor, mainType: 'Ariza' });
+  });
+  sheets.push({ name: 'Diger Bakim', mainType: 'Normal' });
+  return sheets;
+}
+
+function ensureRecordSheet(ss, sheetName) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+  const headers = getHeadersForSheet(sheetName);
+  const existingHeaders = getSheetHeaders(sheet);
+
+  if (existingHeaders.length && headers.join('|') !== existingHeaders.join('|')) {
+    rewriteSheetRowsToHeaders(sheet, existingHeaders, headers);
+  }
+
+  if (sheet.getMaxColumns() < headers.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+  }
+
+  sheet.getRange(1, 1, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#1d4ed8')
+    .setFontColor('#ffffff');
+  if (sheet.getLastColumn() > headers.length) {
+    sheet.getRange(1, headers.length + 1, 1, sheet.getLastColumn() - headers.length).clearContent();
+  }
+  sheet.setFrozenRows(1);
+
+  return sheet;
+}
+
+function rewriteSheetRowsToHeaders(sheet, oldHeaders, newHeaders) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const oldColumnCount = oldHeaders.length;
+  const rowCount = lastRow - 1;
+  const oldRows = sheet.getRange(2, 1, rowCount, oldColumnCount).getValues();
+  const newRows = oldRows.map(function(row) {
+    return newHeaders.map(function(header) {
+      const oldIndex = oldHeaders.indexOf(header);
+      return oldIndex === -1 ? '' : row[oldIndex];
+    });
+  });
+
+  const clearColumnCount = Math.max(oldColumnCount, newHeaders.length);
+  sheet.getRange(2, 1, rowCount, clearColumnCount).clearContent();
+  sheet.getRange(2, 1, newRows.length, newHeaders.length).setValues(newRows);
+}
+
+function getHeadersForSheet(sheetName) {
+  const kind = getSheetKind(sheetName);
+  return COMMON_RECORD_HEADERS.concat(SHEET_EXTRA_HEADERS[kind] || []);
+}
+
+function getSheetKind(sheetName) {
+  const text = normalizeSearchText(sheetName);
+  if (text.indexOf('PERIYODIK') === 0) return 'periodic';
+  if (text.indexOf('YAG NUMUNE') === 0) return 'oilSample';
+  if (text.indexOf('YAG FILTRE DEGISIMI') === 0) return 'oilFilter';
+  if (text.indexOf('YAG FILITRE DEGISIMI') === 0) return 'oilFilter';
+  if (text.indexOf('YAG DEGISIMI') === 0) return 'oilChange';
+  if (text.indexOf('HT LT CEKET SUYU') === 0) return 'htLtJacket';
+  if (text.indexOf('ALTERNATOR GRESLEME') === 0) return 'alternator';
+  if (text.indexOf('ARIZA') === 0) return 'fault';
+  return 'other';
+}
+
+function ensureStatsSheet(ss) {
+  let sheet = ss.getSheetByName(SHEET_STATS);
+  if (!sheet) sheet = ss.insertSheet(SHEET_STATS);
+  sheet.getRange(1, 1, 1, 8)
+    .setValues([['Ay', 'Toplam', 'Periyodik', 'Normal', 'Ariza', 'GM-1', 'GM-2', 'GM-3']])
+    .setFontWeight('bold')
+    .setBackground('#15803d')
+    .setFontColor('#ffffff');
+  return sheet;
+}
+
+function ensureSettingsSheet(ss) {
+  let sheet = ss.getSheetByName(SHEET_SETTINGS);
+  if (!sheet) sheet = ss.insertSheet(SHEET_SETTINGS);
+  if (!sheet.getRange(1, 1).getValue()) {
+    sheet.getRange(1, 1, 1, 2).setValues([['Ayar', 'Deger']]).setFontWeight('bold');
+    sheet.getRange(2, 1, 1, 2).setValues([['Son Kayit No', '']]);
+    sheet.getRange(3, 1, 1, 2).setValues([['Bildirim Maili', DEFAULT_ALERT_EMAIL]]);
+  }
+  return sheet;
+}
+
+function saveMaintenanceRecordV2(ss, params) {
+  const mainType = normalizeMainType(getParam(params, 'type'));
+  const subtype = normalizeSubtype(getParam(params, 'subtype'));
+  const motor = normalizeMotor(getParam(params, 'motor'));
+  const sheetName = getTargetSheetName(mainType, subtype, motor);
+  const sheet = ensureRecordSheet(ss, sheetName);
+  const headers = getHeadersForSheet(sheetName);
+  const now = new Date();
+  const createdAt = formatDateTime(now);
+  const submittedMotorHours = getRecordMotorHours(params, 0);
+  const shouldReadCurrentHours = mainType === 'Periyodik' || submittedMotorHours <= 0;
+  const currentHours = shouldReadCurrentHours ? getLatestEnergyMotorHours(ss, motor) : 0;
+  const effectiveCurrentHours = currentHours || submittedMotorHours;
+  const recordMotorHours = submittedMotorHours || currentHours;
+  const periodicPlan = mainType === 'Periyodik' ? calculatePeriodicPlan(effectiveCurrentHours) : null;
+  const recordNo = createRecordNo(ss, mainType);
+  const fileCount = parseInt(getParam(params, 'fileCount'), 10) || 0;
+  const files = uploadFilesIfPresent(params, mainType, motor, subtype, fileCount);
+  const warningStatus = periodicPlan ? getPeriodicWarningStatus(periodicPlan) : '';
+
+  const recordMap = {
+    'Kayit No': recordNo,
+    'Tarih': getParam(params, 'date') || formatDate(now),
+    'Saat': getParam(params, 'time') || formatTime(now),
+    'Motor': motor,
+    'Bakim Ana Turu': mainType,
+    'Bakim Alt Turu': subtype,
+    'Destek Tipi': normalizeSupportType(getParam(params, 'company')),
+    'Sorumlu': getParam(params, 'technician'),
+    'Durum': normalizeStatus(getParam(params, 'status')),
+    'Aciklama': getParam(params, 'notes'),
+    'Dosyalar': files,
+    'Kayit Zamani': createdAt,
+    'Kapama Zamani': '',
+    'Guncel Motor Saati': recordMotorHours,
+    'Baslangic Tarihi': getParam(params, 'startDate') || getParam(params, 'date') || formatDate(now),
+    'Baslangic Saati': getParam(params, 'startTime') || getParam(params, 'time') || formatTime(now),
+    'Bitis Tarihi': getParam(params, 'endDate') || getParam(params, 'date') || formatDate(now),
+    'Bitis Saati': getParam(params, 'endTime') || getParam(params, 'time') || formatTime(now),
+    'Periyodik Son Esik': periodicPlan ? periodicPlan.lastThreshold : '',
+    'Periyodik Sonraki Esik': periodicPlan ? periodicPlan.nextThreshold : '',
+    'Kalan Saat': periodicPlan ? periodicPlan.remainingHours : '',
+    'Bildirim Durumu': warningStatus,
+    'Plan Detayi': periodicPlan ? periodicPlan.planDetail : '',
+    'Ariza Saati': getParam(params, 'faultTime'),
+    'Ariza Nedeni': mainType === 'Ariza' ? subtype : '',
+    'Barkod No': getParam(params, 'barcodeNumber'),
+    'Yag Calisma Saati': getParam(params, 'filterOilHours'),
+    'HT Deger': getParam(params, 'htTemperature'),
+    'LT Deger': getParam(params, 'ltTemperature'),
+    'Ceket Suyu Deger': getParam(params, 'jacketTemperature'),
+    'Alternator On': getParam(params, 'alternatorFront'),
+    'Alternator Arka': getParam(params, 'alternatorRear'),
+    'Alternator Toplam': getParam(params, 'alternatorTotal')
+  };
+  const row = headers.map(function(header) {
+    return Object.prototype.hasOwnProperty.call(recordMap, header) ? recordMap[header] : '';
+  });
+
+  sheet.appendRow(row);
+  const newRow = sheet.getLastRow();
+  sheet.getRange(newRow, 1, 1, row.length).setFontFamily('Arial').setFontSize(10);
+  updateLastRecordNo(ss, recordNo);
+
+  const alternatorPlan = getSheetKind(sheetName) === 'alternator'
+    ? calculateAlternatorGreasePlan(effectiveCurrentHours, recordMotorHours)
+    : null;
+
+  return jsonResponse(true, 'Kayit basariyla eklendi', {
+    recordNo: recordNo,
+    sheetName: sheetName,
+    currentHours: effectiveCurrentHours,
+    recordMotorHours: recordMotorHours,
+    periodicPlan: periodicPlan,
+    alternatorPlan: alternatorPlan,
+    nextAlternatorGrease: alternatorPlan ? alternatorPlan.nextHours : ''
   });
 }
 
-function createMaintenanceSheet(ss, sheetName, sheetTitle) {
-  let sheet = ss.getSheetByName(sheetName);
-  
-  if (sheet) {
-    // Mevcut sayfayı kontrol et ve düzelt
-    Logger.log('Mevcut ' + sheetName + ' sayfası kontrol ediliyor...');
-    
-    // Mevcut sütun sayısını kontrol et
-    const lastColumn = sheet.getLastColumn();
-    Logger.log('Mevcut sütun sayısı: ' + lastColumn);
-    
-    if (lastColumn > 21) {
-      // Fazla sütunları temizle
-      Logger.log('Fazla sütunlar temizleniyor...');
-      sheet.deleteColumns(22, lastColumn - 21);
-    }
-    
-    // Header'ları kontrol et ve güncelle
-    const currentHeaders = sheet.getRange('A1:U1').getValues()[0];
-    const expectedHeaders = [
-      'Kayıt No', 'Tarih', 'Motor', 'Bakım Türü', 'Bakım Tipi',
-      'Teknisyen', 'Firma', 'Notlar', 'Dosyalar', 'Durum', 'Oluşturulma Tarihi',
-      'Motor Saati', 'Barkod No', 'Alt. Ön (cm³)', 'Alt. Arka (cm³)', 'Alt. Toplam (cm³)',
-      'Filtre Motor Saati', 'Filtre Yağ Saati', 'HT Sıcaklık (°C)', 'LT Sıcaklık (°C)', 'Ceket Suyu (°C)'
-    ];
-    
-    // Header'ları güncelle
-    sheet.getRange('A1:U1')
-      .setValues([expectedHeaders])
-      .setFontWeight('bold')
-      .setBackground('#4285f4')
-      .setFontColor('white');
-      
-  } else {
-    // Yeni sayfa oluştur
-    sheet = ss.insertSheet(sheetName);
-    
-    const maintenanceHeaders = [
-      'Kayıt No',
-      'Tarih',
-      'Motor',
-      'Bakım Türü',
-      'Bakım Tipi',
-      'Teknisyen',
-      'Firma',
-      'Notlar',
-      'Dosyalar',
-      'Durum',
-      'Oluşturulma Tarihi',
-      'Motor Saati',
-      'Barkod No',
-      'Alt. Ön (cm³)',
-      'Alt. Arka (cm³)',
-      'Alt. Toplam (cm³)',
-      'Filtre Motor Saati',
-      'Filtre Yağ Saati',
-      'HT Sıcaklık (°C)',
-      'LT Sıcaklık (°C)',
-      'Ceket Suyu (°C)'
-    ];
-    
-    sheet.getRange('A1:U1')
-      .setValues([maintenanceHeaders])
-      .setFontWeight('bold')
-      .setBackground('#4285f4')
-      .setFontColor('white');
-      
-    Logger.log('Yeni ' + sheetName + ' sayfası oluşturuldu');
+function createQuickMaintenanceRecord(ss, params, mainType, subtype) {
+  params.type = [mainType];
+  params.subtype = [subtype];
+  params.status = ['Aktif'];
+  params.notes = [subtype + ' otomatik kaydi'];
+  params.technician = ['SISTEM'];
+  params.company = ['IC DESTEK'];
+  if (getParam(params, 'currentHours') && !getParam(params, 'motorHours')) {
+    params.motorHours = [getParam(params, 'currentHours')];
   }
-  
-  // Sütun genişlikleri (16 sütun)
-  sheet.setColumnWidth(1, 120);  // Kayıt No
-  sheet.setColumnWidth(2, 100);  // Tarih
-  sheet.setColumnWidth(3, 80);   // Motor
-  sheet.setColumnWidth(4, 80);   // Bakım Türü
-  sheet.setColumnWidth(5, 100);  // Bakım Tipi
-  sheet.setColumnWidth(6, 120);  // Teknisyen
-  sheet.setColumnWidth(7, 150);  // Firma
-  sheet.setColumnWidth(8, 100);  // Notlar
-  sheet.setColumnWidth(9, 300);  // Dosyalar
-  sheet.setColumnWidth(10, 200); // Durum
-  sheet.setColumnWidth(11, 80);  // Oluşturulma Tarihi
-  sheet.setColumnWidth(12, 80);  // Motor Saati
-  sheet.setColumnWidth(13, 100); // Barkod No
-  sheet.setColumnWidth(14, 80);  // Alt. Ön (cm³)
-  sheet.setColumnWidth(15, 80);  // Alt. Arka (cm³)
-  sheet.setColumnWidth(16, 90);  // Alt. Toplam (cm³)
-  sheet.setColumnWidth(17, 90);  // Filtre Motor Saati
-  sheet.setColumnWidth(18, 90);  // Filtre Yağ Saati
-  sheet.setColumnWidth(19, 80);  // HT Sıcaklık (°C)
-  sheet.setColumnWidth(20, 80);  // LT Sıcaklık (°C)
-  sheet.setColumnWidth(21, 90);  // Ceket Suyu (°C)
-  
-  // İstatistikler sayfası
-  let statsSheet = ss.getSheetByName(SHEET_NAMES.STATISTICS);
-  
-  if (statsSheet) {
-    Logger.log('Mevcut İstatistikler sayfası kontrol ediliyor...');
-    
-    const lastColumn = statsSheet.getLastColumn();
-    if (lastColumn > 8) {
-      statsSheet.deleteColumns(9, lastColumn - 8);
-    }
-    
-    const statsHeaders = [
-      'Tarih', 'Toplam Bakım', 'Periyodik', 'Normal', 'Arıza', 'GM-1', 'GM-2', 'GM-3'
-    ];
-    
-    statsSheet.getRange('A1:H1')
-      .setValues([statsHeaders])
-      .setFontWeight('bold')
-      .setBackground('#34a853')
-      .setFontColor('white');
-      
-  } else {
-    statsSheet = ss.insertSheet(SHEET_NAMES.STATISTICS);
-    
-    const statsHeaders = [
-      'Tarih',
-      'Toplam Bakım',
-      'Periyodik',
-      'Normal',
-      'Arıza',
-      'GM-1',
-      'GM-2',
-      'GM-3'
-    ];
-    
-    statsSheet.getRange('A1:H1')
-      .setValues([statsHeaders])
-      .setFontWeight('bold')
-      .setBackground('#34a853')
-      .setFontColor('white');
-  }
-  
-  statsSheet.setColumnWidth(1, 100);
-  statsSheet.setColumnWidth(2, 100);
-  statsSheet.setColumnWidth(3, 100);
-  statsSheet.setColumnWidth(4, 100);
-  statsSheet.setColumnWidth(5, 100);
-  statsSheet.setColumnWidth(6, 80);
-  statsSheet.setColumnWidth(7, 80);
-  statsSheet.setColumnWidth(8, 80);
-  
-  // Ayarlar sayfası
-  let settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
-  
-  if (settingsSheet) {
-    Logger.log('Mevcut Ayarlar sayfası kontrol ediliyor...');
-    
-    const lastColumn = settingsSheet.getLastColumn();
-    if (lastColumn > 3) {
-      settingsSheet.deleteColumns(4, lastColumn - 3);
-    }
-    
-    const settingsHeaders = ['Ayar', 'Değer', 'Açıklama'];
-    settingsSheet.getRange('A1:C1')
-      .setValues([settingsHeaders])
-      .setFontWeight('bold')
-      .setBackground('#fbbc04')
-      .setFontColor('white');
-      
-  } else {
-    settingsSheet = ss.insertSheet(SHEET_NAMES.SETTINGS);
-    
-    const settingsHeaders = ['Ayar', 'Değer', 'Açıklama'];
-    const settingsData = [
-      ['Son Kayıt No', '0', 'Otomatik artan kayıt numarası'],
-      ['Sistem Versiyonu', '1.0', 'Bakım takip sistemi versiyonu'],
-      ['Oluşturulma Tarihi', new Date().toLocaleDateString('tr-TR'), 'Sistem kurulum tarihi']
-    ];
-    
-    settingsSheet.getRange('A1:C1')
-      .setValues([settingsHeaders])
-      .setFontWeight('bold')
-      .setBackground('#fbbc04')
-      .setFontColor('white');
-    
-    settingsSheet.getRange('A2:C4')
-      .setValues(settingsData);
-  }
-  
-  settingsSheet.setColumnWidth(1, 150);
-  settingsSheet.setColumnWidth(2, 200);
-  settingsSheet.setColumnWidth(3, 300);
-  
-  // Motor Saatleri sayfası
-  let motorHoursSheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-  
-  if (motorHoursSheet) {
-    Logger.log('Mevcut Motor Saatleri sayfası kontrol ediliyor...');
-    
-    const lastColumn = motorHoursSheet.getLastColumn();
-    if (lastColumn > 10) {
-      motorHoursSheet.deleteColumns(11, lastColumn - 10);
-    }
-    
-    const motorHoursHeaders = ['Motor', 'Çalışma Saati', 'Son Yağ Numune Saati', 'Son Yağ Numune Tarihi', 'Bir Sonraki Yağ Numune', 'Notlar', 'Son Alternatör Gresleme Saati', 'Son Alternatör Gresleme Tarihi', 'Bir Sonraki Alternatör Gresleme', 'Alternatör Notlar'];
-    motorHoursSheet.getRange('A1:J1')
-      .setValues([motorHoursHeaders])
-      .setFontWeight('bold')
-      .setBackground('#ea4335')
-      .setFontColor('white');
-      
-  } else {
-    motorHoursSheet = ss.insertSheet(SHEET_NAMES.MOTOR_HOURS);
-    
-    const motorHoursHeaders = ['Motor', 'Çalışma Saati', 'Son Yağ Numune Saati', 'Son Yağ Numune Tarihi', 'Bir Sonraki Yağ Numune', 'Notlar', 'Son Alternatör Gresleme Saati', 'Son Alternatör Gresleme Tarihi', 'Bir Sonraki Alternatör Gresleme', 'Alternatör Notlar'];
-    const motorHoursData = [
-      ['GM-1', '0', '0', '', '500', 'Otomatik hesaplanır', '0', '', '1000', ''],
-      ['GM-2', '0', '0', '', '500', 'Otomatik hesaplanır', '0', '', '1000', ''],
-      ['GM-3', '0', '0', '', '500', 'Otomatik hesaplanır', '0', '', '1000', '']
-    ];
-    
-    motorHoursSheet.getRange('A1:J1')
-      .setValues([motorHoursHeaders])
-      .setFontWeight('bold')
-      .setBackground('#ea4335')
-      .setFontColor('white');
-    
-    motorHoursSheet.getRange('A2:J4')
-      .setValues(motorHoursData);
-  }
-  
-  motorHoursSheet.setColumnWidth(1, 80);
-  motorHoursSheet.setColumnWidth(2, 120);
-  motorHoursSheet.setColumnWidth(3, 150);
-  motorHoursSheet.setColumnWidth(4, 150);
-  motorHoursSheet.setColumnWidth(5, 150);
-  motorHoursSheet.setColumnWidth(6, 200);
-  motorHoursSheet.setColumnWidth(7, 180);
-  motorHoursSheet.setColumnWidth(8, 180);
-  motorHoursSheet.setColumnWidth(9, 200);
-  motorHoursSheet.setColumnWidth(10, 200);
-  
-  Logger.log('Tüm sayfalar başarılya kontrol edildi ve hazırlandı');
+  return saveMaintenanceRecordV2(ss, params);
 }
 
-// Bakım kaydı kaydet
-function saveMaintenanceRecord(ss, params) {
-  try {
-    Logger.log('=== BAKIM KAYDI BAŞLATILIYOR ===');
-    Logger.log('Raw parametreler: ' + JSON.stringify(params));
-    
-    // Parametreleri array'den string'e çevir - güçlendirilmiş versiyon
-    const getParam = (key) => {
-      const val = params[key];
-      Logger.log('getParam - ' + key + ': ' + JSON.stringify(val) + ' (type: ' + typeof val + ')');
-      if (Array.isArray(val)) return val[0] || '';
-      if (typeof val === 'undefined' || val === null) return '';
-      return String(val);
-    };
-    
-    // Bakım türüne göre doğru sayfayı seç
-    const maintenanceType = getParam('type');
-    let sheetName;
-    
-    if (maintenanceType && maintenanceType.toLowerCase().includes('periyodik')) {
-      sheetName = SHEET_NAMES.PERIODIC_MAINTENANCE;
-    } else if (maintenanceType && maintenanceType.toLowerCase().includes('normal')) {
-      sheetName = SHEET_NAMES.NORMAL_MAINTENANCE;
-    } else if (maintenanceType && maintenanceType.toLowerCase().includes('arıza')) {
-      sheetName = SHEET_NAMES.FAULT_MAINTENANCE;
-    } else {
-      sheetName = SHEET_NAMES.PERIODIC_MAINTENANCE; // Varsayılan
-    }
-    
-    Logger.log('Seçilen bakım türü: ' + maintenanceType + ', Sayfa: ' + sheetName);
-    const sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-      throw new Error(sheetName + ' sayfası bulunamadı');
-    }
-    
-    Logger.log('Sayfa bulundu: ' + sheet.getName());
-    
-    // Kayıt numarasını al
-    const lastRow = sheet.getLastRow();
-    Logger.log('Son satır: ' + lastRow);
-    
-    const recordNo = lastRow === 1 ? generateRecordNo('', maintenanceType) : generateRecordNo(sheet.getRange(lastRow, 1).getValue(), maintenanceType);
-    Logger.log('Kayıt numarası: ' + recordNo);
-    
-    // Dosya yükleme (varsa)
-    let uploadedFiles = '';
-    const filesParam = getParam('files');
-    if (filesParam && filesParam !== 'undefined' && filesParam !== '' && filesParam !== '[]') {
-      Logger.log('Dosyalar işleniyor...');
-      uploadedFiles = uploadFilesToDrive(params, getParam('type') || 'normal');
-      Logger.log('Dosyalar yüklendi: ' + uploadedFiles);
-    }
-    
-    // Parametreleri al ve kontrol et
-    const record = [
-      recordNo || '',
-      getParam('date') || new Date().toLocaleDateString('tr-TR'),
-      getParam('motor') || '',
-      getParam('type') || '',
-      getParam('subtype') || '',
-      getParam('technician') || '',
-      getParam('company') || '',
-      getParam('notes') || '',
-      uploadedFiles,
-      getParam('status') || 'Aktif',
-      new Date().toLocaleDateString('tr-TR'),
-      getParam('motorHours') || '',  // Motor Saati
-      getParam('barcodeNumber') || '',  // Barkod No
-      getParam('alternatorFront') || '',  // Alt. Ön (cm³)
-      getParam('alternatorRear') || '',  // Alt. Arka (cm³)
-      getParam('alternatorTotal') || '',  // Alt. Toplam (cm³)
-      getParam('filterMotorHours') || '',  // Filtre Motor Saati
-      getParam('filterOilHours') || '',  // Filtre Yağ Saati
-      getParam('htTemperature') || '',  // HT Sıcaklık (°C)
-      getParam('ltTemperature') || '',  // LT Sıcaklık (°C)
-      getParam('jacketTemperature') || ''  // Ceket Suyu (°C)
-    ];
-    
-    Logger.log('Kayıt dizisi oluşturuldu, uzunluk: ' + record.length);
-    Logger.log('Kayıt verisi: ' + JSON.stringify(record));
-    
-    // Yeni satır ekle
-    sheet.appendRow(record);
-    Logger.log('Satır eklendi');
-    
-    // Formatlama
-    const newRow = sheet.getLastRow();
-    sheet.getRange(newRow, 1, 1, 21).setFontFamily('Arial').setFontSize(10);
-    Logger.log('Formatlama yapıldı');
-    
-    // Kayıt numarasını güncelle
-    updateLastRecordNo(ss, recordNo);
-    Logger.log('Kayıt numarası güncellendi');
-    
-    // İstatistikleri güncelle
-    updateStatistics(ss, params);
-    Logger.log('İstatistikler güncellendi');
-    
-    Logger.log('Bakım kaydı başarıyla eklendi: ' + recordNo);
-    
-    return createResponse(true, "Kayıt başarıyla eklendi", {
-      recordNo: recordNo,
-      timestamp: new Date().toLocaleDateString('tr-TR'),
-      files: uploadedFiles
-    });
-    
-  } catch (error) {
-    Logger.log('KAYIT HATASI: ' + error.toString());
-    Logger.log('Hata detayı: ' + error.stack);
-    throw new Error('Kayıt eklenemedi: ' + error.toString());
-  }
-}
-
-// Dosyaları Drive'a yükle - Klasör linki döndür
-function uploadFilesToDrive(params, maintenanceType) {
-  try {
-    Logger.log('=== DOSYA YÜKLEME BAŞLATILIYOR ===');
-    
-    // maintenanceType'ı string'e çevir (array olabilir)
-    const typeStr = Array.isArray(maintenanceType) ? maintenanceType[0] : maintenanceType;
-    Logger.log('Maintenance type (string): ' + typeStr);
-    
-    // files parametresini array'den string'e çevir
-    const filesParam = Array.isArray(params.files) ? params.files[0] : params.files;
-    Logger.log('Files param: ' + filesParam);
-    
-    // Bakım türüne göre doğru Drive folder'ını seç
-    let folderId = DRIVE_FOLDERS.NORMAL;
-    let folderName = 'Normal Bakım';
-    
-    if (typeStr) {
-      const typeLower = typeStr.toLowerCase();
-      if (typeLower.includes('periyodik')) {
-        folderId = DRIVE_FOLDERS.PERIODIC;
-        folderName = 'Periyodik Bakım';
-      } else if (typeLower.includes('normal')) {
-        folderId = DRIVE_FOLDERS.NORMAL;
-        folderName = 'Normal Bakım';
-      } else if (typeLower.includes('ariza')) {
-        folderId = DRIVE_FOLDERS.FAULT;
-        folderName = 'Arıza Bakımı';
-      }
-    }
-    
-    Logger.log('Seçilen folder: ' + folderName + ' (' + folderId + ')');
-    
-    // Drive folder'ını al
-    const folder = DriveApp.getFolderById(folderId);
-    const folderUrl = 'https://drive.google.com/drive/folders/' + folderId;
-    Logger.log('Folder URL: ' + folderUrl);
-    
-    // Dosya kontrolü
-    let filesArray = [];
-    if (filesParam && filesParam !== 'undefined' && filesParam !== '' && filesParam !== '[]') {
-      try {
-        filesArray = JSON.parse(filesParam);
-        Logger.log('Parse edilen dosya sayısı: ' + filesArray.length);
-      } catch (e) {
-        Logger.log('JSON parse hatası: ' + e);
-      }
-    }
-    
-    // motor parametresini al
-    const motorParam = Array.isArray(params.motor) ? params.motor[0] : params.motor;
-    
-    let uploadedCount = 0;
-    
-    // Dosyaları yükle
-    if (filesArray && filesArray.length > 0) {
-      filesArray.forEach((fileData, index) => {
-        try {
-          if (!fileData.base64) {
-            Logger.log('Dosya ' + (index + 1) + ' için base64 yok');
-            return;
-          }
-          
-          let base64Data = fileData.base64;
-          if (base64Data.includes(',')) {
-            base64Data = base64Data.split(',')[1];
-          }
-          
-          const blob = Utilities.base64Decode(base64Data);
-          const fileBlob = Utilities.newBlob(blob, fileData.type || 'application/octet-stream', fileData.name);
-          
-          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-          const fileName = `${motorParam || 'Bilinmeyen'}_${typeStr || 'Bakim'}_${timestamp}_${fileData.name}`;
-          
-          const driveFile = folder.createFile(fileBlob.setName(fileName));
-          driveFile.setSharing(DriveApp.Domain.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          
-          uploadedCount++;
-          Logger.log('✅ Yüklendi: ' + fileName);
-          
-        } catch (err) {
-          Logger.log('❌ Dosya hatası: ' + err);
-        }
-      });
-    }
-    
-    Logger.log('=== YÜKLEME TAMAMLANDI ===');
-    Logger.log(uploadedCount + ' dosya yüklendi');
-    
-    // Klasör linkini döndür
-    return folderUrl;
-    
-  } catch (error) {
-    Logger.log('❌❌ Drive hatası: ' + error);
-    return '';
-  }
-}
-
-// Kayıt numarası oluştur
-function generateRecordNo(lastRecordNo, maintenanceType) {
-  if (!lastRecordNo) {
-    // İlk kayıt için bakım türüne göre prefix
-    switch(maintenanceType) {
-      case 'Periyodik': return 'PB-00001';
-      case 'Normal': return 'NB-00001';
-      case 'Arıza': return 'AB-00001';
-      default: return 'BK-00001';
-    }
-  }
-  
-  // Mevcut kayıt numarasından prefix ve numarayı ayır
-  let prefix = 'BK';
-  let match = lastRecordNo.match(/([A-Z]+)-(\d+)/);
-  
-  if (match) {
-    prefix = match[1];
-    const nextNumber = parseInt(match[2]) + 1;
-    return prefix + '-' + nextNumber.toString().padStart(5, '0');
-  } else {
-    // Eğer format uymazsa, bakım türüne göre yeni kayıt oluştur
-    switch(maintenanceType) {
-      case 'Periyodik': return 'PB-00001';
-      case 'Normal': return 'NB-00001';
-      case 'Arıza': return 'AB-00001';
-      default: return 'BK-00001';
-    }
-  }
-}
-
-// Son kayıt numarasını güncelle
-function updateLastRecordNo(ss, recordNo) {
-  const settingsSheet = ss.getSheetByName(SHEET_NAMES.SETTINGS);
-  const recordNoCell = settingsSheet.getRange('A2:B2');
-  recordNoCell.setValues([['Son Kayıt No', recordNo]]);
-}
-
-// Belirli bir aydaki istatistikleri hesapla
-function calculateMonthlyStatistics(ss, year, month) {
-  try {
-    Logger.log(`=== ${year}-${month} AYI İSTATİSTİKLERİ HESAPLANIYOR ===`);
-    
-    // Sayfaları al
-    const periodicSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    const normalSheet = ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE);
-    const faultSheet = ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE);
-    
-    Logger.log('Sayfa durumları:');
-    Logger.log('  - Periyodik: ' + (periodicSheet ? 'BULUNDU' : 'YOK'));
-    Logger.log('  - Normal: ' + (normalSheet ? 'BULUNDU' : 'YOK'));
-    Logger.log('  - Arıza: ' + (faultSheet ? 'BULUNDU' : 'YOK'));
-    
-    // İstatistikleri tutacak obje
-    const stats = {
-      total: 0,
-      periodic: 0,
-      normal: 0,
-      fault: 0,
-      gm1: 0,
-      gm2: 0,
-      gm3: 0
-    };
-    
-    // Yardımcı fonksiyon: Motor kodunu normalize et
-    function normalizeMotor(motorValue) {
-      if (!motorValue) return '';
-      return String(motorValue).toLowerCase().replace(/[-\s]/g, '');
-    }
-    
-    // Yardımcı fonksiyon: Sayfadaki kayıtları say
-    function countRecords(sheet, type, typeLabel) {
-      if (!sheet) {
-        Logger.log(typeLabel + ' sayfası bulunamadı, atlanıyor');
-        return;
-      }
-      
-      const lastRow = sheet.getLastRow();
-      Logger.log(`${typeLabel} sayfası son satır: ${lastRow}`);
-      
-      if (lastRow <= 1) {
-        Logger.log(typeLabel + ' sayfasında kayıt yok');
-        return;
-      }
-      
-      // 3 kolon oku: Kayıt No(0), Tarih(1), Motor(2)
-      const data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
-      Logger.log(`${typeLabel} sayfasından ${data.length} satır okundu`);
-      
-      let count = 0;
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i];
-        // Tarih değerini olduğu gibi al (Date objesi veya string olabilir)
-        const recordDate = row[1];
-        const motorRaw = row[2];
-        const motor = normalizeMotor(motorRaw);
-        
-        Logger.log(`${typeLabel} Satır ${i+2}: Tarih="${recordDate}" (tip: ${typeof recordDate}), Motor="${motorRaw}" -> normalize="${motor}"`);
-        
-        // Tarih kontrolü - Date objesi veya string olarak geçir
-        const inMonth = isDateInMonth(recordDate, year, month);
-        Logger.log(`  -> isDateInMonth sonucu = ${inMonth}`);
-        
-        if (inMonth) {
-          count++;
-          stats[type]++;
-          stats.total++;
-          
-          // Motor bazında say (gm1, gm2, gm3 formatında)
-          if (motor.includes('gm1')) {
-            stats.gm1++;
-            Logger.log('  -> GM1 sayıldı');
-          } else if (motor.includes('gm2')) {
-            stats.gm2++;
-            Logger.log('  -> GM2 sayıldı');
-          } else if (motor.includes('gm3')) {
-            stats.gm3++;
-            Logger.log('  -> GM3 sayıldı');
-          } else {
-            Logger.log('  -> Motor eşleşmedi: ' + motor);
-          }
-        }
-      }
-      
-      Logger.log(`${typeLabel} sayfasında ${count} kayıt sayıldı`);
-    }
-    
-    // Tüm sayfalardan kayıtları say
-    countRecords(periodicSheet, 'periodic', 'Periyodik');
-    countRecords(normalSheet, 'normal', 'Normal');
-    countRecords(faultSheet, 'fault', 'Arıza');
-    
-    Logger.log('=== HESAPLANAN İSTATİSTİKLER ===');
-    Logger.log('  - Toplam: ' + stats.total);
-    Logger.log('  - Periyodik: ' + stats.periodic);
-    Logger.log('  - Normal: ' + stats.normal);
-    Logger.log('  - Arıza: ' + stats.fault);
-    Logger.log('  - GM1: ' + stats.gm1);
-    Logger.log('  - GM2: ' + stats.gm2);
-    Logger.log('  - GM3: ' + stats.gm3);
-    
-    return stats;
-  } catch (error) {
-    Logger.log('❌ calculateMonthlyStatistics hatası: ' + error.toString());
-    Logger.log('Hata stack: ' + error.stack);
-    return { total: 0, periodic: 0, normal: 0, fault: 0, gm1: 0, gm2: 0, gm3: 0 };
-  }
-}
-
-// Tarih belirli ay/yıl içinde mi kontrol et (Date objesi veya DD.MM.YYYY formatı)
-function isDateInMonth(dateInput, year, month) {
-  try {
-    if (!dateInput || dateInput === '') return false;
-    
-    let recordYear, recordMonth;
-    
-    // Eğer Date objesi geldiyse
-    if (dateInput instanceof Date) {
-      recordYear = dateInput.getFullYear();
-      recordMonth = dateInput.getMonth() + 1; // JavaScript aylar 0-11
-      Logger.log(`  -> Date objesi algılandı: ${dateInput} -> Yıl: ${recordYear}, Ay: ${recordMonth}`);
-    } else {
-      // String formatı - DD.MM.YYYY formatını parse et
-      const dateStr = String(dateInput).trim();
-      const parts = dateStr.split('.');
-      if (parts.length !== 3) {
-        Logger.log(`  -> Geçersiz tarih formatı: ${dateStr}`);
-        return false;
-      }
-      
-      recordYear = parseInt(parts[2], 10);
-      recordMonth = parseInt(parts[1], 10);
-    }
-    
-    // Ay ve yıl eşleşiyor mu?
-    const result = recordYear === year && recordMonth === month;
-    Logger.log(`  -> Karşılaştırma: ${recordYear} === ${year} && ${recordMonth} === ${month} = ${result}`);
-    return result;
-  } catch (error) {
-    Logger.log('❌ Tarih parse hatası: ' + dateInput + ' - ' + error.toString());
-    return false;
-  }
-}
-
-// İstatistikleri güncelle - Bakım tarihine göre ay bazlı hesaplama
-function updateStatistics(ss, params) {
-  try {
-    Logger.log('=== İSTATİSTİKLER GÜNCELLENİYOR ===');
-    Logger.log('Params: ' + JSON.stringify(params));
-    
-    let statsSheet = ss.getSheetByName(SHEET_NAMES.STATISTICS);
-    
-    // İstatistikler sayfası yoksa oluştur
-    if (!statsSheet) {
-      Logger.log('İstatistikler sayfası bulunamadı, oluşturuluyor...');
-      statsSheet = ss.insertSheet(SHEET_NAMES.STATISTICS);
-      // Başlıkları oluştur
-      statsSheet.getRange(1, 1, 1, 8).setValues([['Tarih', 'Toplam Bakım', 'Periyodik', 'Normal', 'Arıza', 'GM-1', 'GM-2', 'GM-3']]);
-      statsSheet.getRange(1, 1, 1, 8).setFontWeight('bold');
-      // Sütun genişlikleri
-      statsSheet.setColumnWidth(1, 12);
-      statsSheet.setColumnWidths(2, 7, 10);
-      Logger.log('İstatistikler sayfası oluşturuldu');
-    }
-    
-    // Bakım tarihini params'dan al (DD.MM.YYYY formatında)
-    const maintenanceDateStr = Array.isArray(params.date) ? params.date[0] : (params.date || '');
-    Logger.log('Bakım tarihi (raw): ' + maintenanceDateStr);
-    
-    let year, month, monthLabel, fullMonthLabel;
-    
-    if (maintenanceDateStr && maintenanceDateStr.includes('.')) {
-      // DD.MM.YYYY formatını parse et
-      const dateParts = maintenanceDateStr.split('.');
-      if (dateParts.length === 3) {
-        year = parseInt(dateParts[2], 10);
-        month = parseInt(dateParts[1], 10);
-        monthLabel = month.toString().padStart(2, '0') + '.' + year;
-        fullMonthLabel = getMonthName(month) + ' ' + year;
-        Logger.log(`✅ Bakım tarihi parse edildi: ${maintenanceDateStr} -> Ay: ${month}, Yıl: ${year}, Label: ${monthLabel}`);
-      } else {
-        // Format uymazsa bugünün tarihini kullan
-        const today = new Date();
-        year = today.getFullYear();
-        month = today.getMonth() + 1;
-        monthLabel = month.toString().padStart(2, '0') + '.' + year;
-        fullMonthLabel = getMonthName(month) + ' ' + year;
-        Logger.log('⚠️ Tarih formatı uyumsuz, bugünün tarihi kullanılıyor: ' + monthLabel);
-      }
-    } else {
-      // Tarih yoksa bugünün tarihini kullan
-      const today = new Date();
-      year = today.getFullYear();
-      month = today.getMonth() + 1;
-      monthLabel = month.toString().padStart(2, '0') + '.' + year;
-      fullMonthLabel = getMonthName(month) + ' ' + year;
-      Logger.log('⚠️ Bakım tarihi bulunamadı, bugünün tarihi kullanılıyor: ' + monthLabel);
-    }
-    
-    Logger.log(`📊 İstatistikler hesaplanıyor: ${fullMonthLabel} (${monthLabel})`);
-    
-    // Bakım tarihinin olduğu ayın istatistiklerini hesapla
-    const calculatedStats = calculateMonthlyStatistics(ss, year, month);
-    
-    Logger.log('Hesaplanan istatistikler: ' + JSON.stringify(calculatedStats));
-    
-    // Ay kaydını bul veya oluştur
-    const lastRow = statsSheet.getLastRow();
-    let monthRow = -1;
-    
-    Logger.log(`İstatistikler sayfası son satır: ${lastRow}`);
-    
-    // İlk satır başlık kontrolü
-    if (lastRow === 0 || lastRow === 1) {
-      // Başlıkları oluştur
-      statsSheet.getRange(1, 1, 1, 8).setValues([['Tarih', 'Toplam Bakım', 'Periyodik', 'Normal', 'Arıza', 'GM-1', 'GM-2', 'GM-3']]);
-      statsSheet.getRange(1, 1, 1, 8).setFontWeight('bold');
-      Logger.log('Başlıklar oluşturuldu');
-    }
-    
-    // Mevcut ayı ara
-    for (let i = 2; i <= statsSheet.getLastRow(); i++) {
-      const rowValue = statsSheet.getRange(i, 1).getValue();
-      // Date objesini stringe çevir (Google Sheets bazen tarih olarak algılar)
-      const rowValueStr = rowValue instanceof Date ? 
-        (rowValue.getMonth() + 1).toString().padStart(2, '0') + '.' + rowValue.getFullYear() :
-        String(rowValue).trim();
-      Logger.log(`Satır ${i} kontrol ediliyor: "${rowValueStr}" === "${monthLabel}"?`);
-      if (rowValueStr === monthLabel || rowValueStr === fullMonthLabel) {
-        monthRow = i;
-        Logger.log(`✅ Mevcut ay bulundu: Satır ${monthRow}`);
-        break;
-      }
-    }
-    
-    if (monthRow === -1) {
-      // Yeni ay kaydı oluştur
-      Logger.log(`Yeni ay kaydı oluşturuluyor: ${monthLabel}`);
-      statsSheet.appendRow([monthLabel, 0, 0, 0, 0, 0, 0, 0]);
-      monthRow = statsSheet.getLastRow();
-      Logger.log(`✅ Yeni ay kaydı oluşturuldu: ${monthLabel} (satır: ${monthRow})`);
-    }
-    
-    // Hesaplanan istatistikleri yaz
-    const values = [
-      calculatedStats.total,
-      calculatedStats.periodic,
-      calculatedStats.normal,
-      calculatedStats.fault,
-      calculatedStats.gm1,
-      calculatedStats.gm2,
-      calculatedStats.gm3
-    ];
-    
-    Logger.log(`İstatistikler yazılıyor: Satır ${monthRow}, Kolon 2-8, Değerler: ${JSON.stringify(values)}`);
-    statsSheet.getRange(monthRow, 2, 1, 7).setValues([values]);
-    
-    Logger.log(`✅ ${fullMonthLabel} istatistikleri güncellendi: Toplam=${calculatedStats.total}, Periyodik=${calculatedStats.periodic}, Normal=${calculatedStats.normal}, Arıza=${calculatedStats.fault}, GM1=${calculatedStats.gm1}, GM2=${calculatedStats.gm2}, GM3=${calculatedStats.gm3}`);
-    
-    // TOPLAM BAKIM ÖZET SATIRINI GÜNCELLE
-    updateTotalMaintenanceSummary(statsSheet);
-    
-    Logger.log('=== İSTATİSTİKLER GÜNCELLENDİ ===');
-    
-  } catch (error) {
-    Logger.log('❌ updateStatistics hatası: ' + error.toString());
-    Logger.log('❌ Hata stack: ' + error.stack);
-  }
-}
-
-// Toplam Bakım Özet Satırını Güncelle
-function updateTotalMaintenanceSummary(statsSheet) {
-  try {
-    Logger.log('📊 Toplam Bakım Özeti hesaplanıyor...');
-    
-    const lastRow = statsSheet.getLastRow();
-    
-    // En altta "TOPLAM" satırı var mı kontrol et
-    let totalRow = -1;
-    for (let i = 2; i <= lastRow; i++) {
-      const rowValue = statsSheet.getRange(i, 1).getValue();
-      if (rowValue.toString().toUpperCase() === 'TOPLAM') {
-        totalRow = i;
-        Logger.log('✅ Mevcut TOPLAM satırı bulundu: Satır ' + totalRow);
-        break;
-      }
-    }
-    
-    // Tüm aylık verileri topla
-    let totalStats = {
-      total: 0,
-      periodic: 0,
-      normal: 0,
-      fault: 0,
-      gm1: 0,
-      gm2: 0,
-      gm3: 0
-    };
-    
-    // Aylık verileri topla (TOPLAM satırı hariç)
-    for (let i = 2; i <= lastRow; i++) {
-      if (i === totalRow) continue; // TOPLAM satırını atla
-      
-      const rowValue = statsSheet.getRange(i, 1).getValue();
-      if (rowValue && rowValue.toString().toUpperCase() !== 'TOPLAM') {
-        // Bu satırdaki verileri topla
-        totalStats.total += statsSheet.getRange(i, 2).getValue() || 0;
-        totalStats.periodic += statsSheet.getRange(i, 3).getValue() || 0;
-        totalStats.normal += statsSheet.getRange(i, 4).getValue() || 0;
-        totalStats.fault += statsSheet.getRange(i, 5).getValue() || 0;
-        totalStats.gm1 += statsSheet.getRange(i, 6).getValue() || 0;
-        totalStats.gm2 += statsSheet.getRange(i, 7).getValue() || 0;
-        totalStats.gm3 += statsSheet.getRange(i, 8).getValue() || 0;
-      }
-    }
-    
-    if (totalRow === -1) {
-      // Yeni TOPLAM satırı ekle
-      Logger.log('📊 Yeni TOPLAM satırı ekleniyor...');
-      statsSheet.appendRow(['TOPLAM', totalStats.total, totalStats.periodic, totalStats.normal, totalStats.fault, totalStats.gm1, totalStats.gm2, totalStats.gm3]);
-      totalRow = statsSheet.getLastRow();
-      
-      // TOPLAM satırını formatla
-      statsSheet.getRange(totalRow, 1, 1, 8)
-        .setFontWeight('bold')
-        .setBackground('#f1f3f4')
-        .setFontColor('#202124');
-    } else {
-      // Mevcut TOPLAM satırını güncelle
-      Logger.log('📊 Mevcut TOPLAM satırı güncelleniyor...');
-      const totalValues = [
-        totalStats.total,
-        totalStats.periodic,
-        totalStats.normal,
-        totalStats.fault,
-        totalStats.gm1,
-        totalStats.gm2,
-        totalStats.gm3
-      ];
-      statsSheet.getRange(totalRow, 2, 1, 7).setValues([totalValues]);
-    }
-    
-    Logger.log(`✅ Toplam Bakım Özeti güncellendi: Toplam=${totalStats.total}, Periyodik=${totalStats.periodic}, Normal=${totalStats.normal}, Arıza=${totalStats.fault}, GM1=${totalStats.gm1}, GM2=${totalStats.gm2}, GM3=${totalStats.gm3}`);
-    
-  } catch (error) {
-    Logger.log('❌ updateTotalMaintenanceSummary hatası: ' + error.toString());
-  }
-}
-
-// Ay ismini getir (Türkçe)
-function getMonthName(monthNumber) {
-  const months = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-    'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+function getRecordMotorHours(params, fallbackHours) {
+  const candidates = [
+    getParam(params, 'alternatorMotorHours'),
+    getParam(params, 'motorHours'),
+    getParam(params, 'filterMotorHours'),
+    getParam(params, 'currentHours')
   ];
-  return months[monthNumber - 1] || 'Bilinmiyor';
+
+  for (let i = 0; i < candidates.length; i++) {
+    const hours = parseNumber(candidates[i]);
+    if (hours > 0) return hours;
+  }
+
+  return fallbackHours;
 }
 
-// Türkçe tarih formatını parse et (DD.MM.YYYY -> Date)
-function parseTurkishDate(dateStr) {
-  if (!dateStr || typeof dateStr !== 'string') return null;
-  
-  // DD.MM.YYYY formatını parse et
-  const parts = dateStr.split('.');
-  if (parts.length === 3) {
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1; // JavaScript aylar 0-11
-    const year = parseInt(parts[2], 10);
-    
-    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-      return new Date(year, month, day);
-    }
+function getTargetSheetName(mainType, subtype, motor) {
+  if (mainType === 'Periyodik') return 'Periyodik ' + motor;
+  if (mainType === 'Ariza') return 'Ariza ' + motor;
+
+  const normalized = normalizeSearchText(subtype);
+  if (normalized.indexOf('NUMUNE') !== -1) return 'Yag Numune ' + motor;
+  if (normalized.indexOf('FILTRE') !== -1 || normalized.indexOf('FILITRE') !== -1) return 'Yag Filtre Degisimi ' + motor;
+  if (normalized.indexOf('YAG') !== -1 && normalized.indexOf('DEGIS') !== -1) return 'Yag Degisimi ' + motor;
+  if (normalized.indexOf('HT') !== -1 && normalized.indexOf('LT') !== -1 &&
+      (normalized.indexOf('CEKET') !== -1 || normalized.indexOf('JACKET') !== -1)) {
+    return 'HT LT Ceket Suyu ' + motor;
   }
-  
-  // Alternatif: Standart Date parse dene
-  const standardDate = new Date(dateStr);
-  if (!isNaN(standardDate.getTime())) {
-    return standardDate;
-  }
-  
-  return null;
+  if (normalized.indexOf('GRES') !== -1 || normalized.indexOf('ALTERNATOR') !== -1) return 'Alternator Gresleme ' + motor;
+  return 'Diger Bakim';
 }
 
-// İstatistikleri al - Ayrı sayfalardan oku
-function getMaintenanceStats(ss, params = {}) {
-  try {
-    Logger.log('🔍 getMaintenanceStats başlatıldı - Ayrı sayfalardan okuma');
-    
-    // Eğer ss parametresi yoksa, spreadsheet'i al
-    if (!ss) {
-      Logger.log('⚠️ ss parametresi yok, getOrCreateSpreadsheet() çağrılıyor...');
-      ss = getOrCreateSpreadsheet();
-      Logger.log('📋 ss alındı: ' + (ss ? 'VAR' : 'YOK'));
-    }
-    
-    Logger.log('📋 ss parametresi: ' + (ss ? 'VAR' : 'YOK'));
-    Logger.log('📋 SHEET_NAMES.PERIODIC_MAINTENANCE: ' + SHEET_NAMES.PERIODIC_MAINTENANCE);
-    Logger.log('📋 SHEET_NAMES.NORMAL_MAINTENANCE: ' + SHEET_NAMES.NORMAL_MAINTENANCE);
-    Logger.log('📋 SHEET_NAMES.FAULT_MAINTENANCE: ' + SHEET_NAMES.FAULT_MAINTENANCE);
-    
-    // Spreadsheet tüm sayfalarını listele
-    if (ss) {
-      const allSheets = ss.getSheets();
-      Logger.log('📊 Tüm sayfalar (' + allSheets.length + '):');
-      allSheets.forEach(sheet => {
-        Logger.log('  - ' + sheet.getName());
-      });
-    }
-    
-    // Ayrı bakım sayfalarını al
-    const periodicSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    const normalSheet = ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE);
-    const faultSheet = ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE);
-    
-    Logger.log('📊 Sayfa durumları:');
-    Logger.log('  - Periyodik: ' + (periodicSheet ? 'BULUNDU' : 'BULUNAMADI'));
-    Logger.log('  - Normal: ' + (normalSheet ? 'BULUNDU' : 'BULUNAMADI'));
-    Logger.log('  - Arıza: ' + (faultSheet ? 'BULUNDU' : 'BULUNAMADI'));
-    
-    // Eğer hiç sheet yoksa boş yanıt dön
-    if (!periodicSheet && !normalSheet && !faultSheet) {
-      Logger.log('❌ Hiçbir bakım sayfası bulunamadı');
-      return createResponse(true, "Henüz veri yok", {
-        stats: { total: 0, monthly: 0, faults: 0, technicians: 0 },
-        chartData: { 
-          labels: ['Oca.2026', 'Şub.2026', 'Mar.2026', 'Nis.2026', 'May.2026', 'Haz.2026'], 
-          periodic: [0, 0, 0, 0, 0, 0],
-          normal: [0, 0, 0, 0, 0, 0],
-          fault: [0, 0, 0, 0, 0, 0]
-        }
-      });
-    }
-    
-    // İstatistikler sayfasından verileri oku
-    const statsSheet = ss.getSheetByName(SHEET_NAMES.STATISTICS);
-    
-    let totalMaintenance = 0;
-    let monthlyCount = 0;
-    let faultCount = 0;
-    const technicians = new Set();
-    
-    if (statsSheet) {
-      Logger.log('📊 İstatistikler sayfası bulundu, veriler okunuyor...');
-      const lastRow = statsSheet.getLastRow();
-      
-      if (lastRow > 1) {
-        const statsData = statsSheet.getRange(2, 1, lastRow - 1, 8).getValues();
-        
-        // Toplam bakım - son satırdaki toplam değeri al
-        if (statsData.length > 0) {
-          const lastRowData = statsData[statsData.length - 1];
-          totalMaintenance = lastRowData[1] || 0; // Toplam sütunu
-          faultCount = lastRowData[4] || 0;      // Arıza sütunu
-          
-          Logger.log('📊 İstatistikler sayfasından okunan veriler:');
-          Logger.log('  - Toplam Bakım: ' + totalMaintenance);
-          Logger.log('  - Arıza: ' + faultCount);
-        }
-        
-        // Bu ayki bakımları bul - güncel ayın verisi
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        const currentMonthStr = (currentMonth + 1).toString().padStart(2, '0') + '.' + currentYear;
-        
-        Logger.log('📊 Aranan ay: ' + currentMonthStr);
-        Logger.log('📊 Stats data length: ' + statsData.length);
-        
-        for (let i = 0; i < statsData.length; i++) {
-          const row = statsData[i];
-          const rowDate = row[0];
-          const rowValue = row[1] || 0;
-          
-          Logger.log(`📊 Satır ${i+2}: "${rowDate}" -> Toplam: ${rowValue}`);
-          
-          // Eğer rowDate bir Date objesi ise, ay ve yılı karşılaştır
-          if (rowDate && typeof rowDate === 'object' && rowDate.getMonth) {
-            const rowMonth = (rowDate.getMonth() + 1).toString().padStart(2, '0');
-            const rowYear = rowDate.getFullYear().toString();
-            const rowMonthStr = rowMonth + '.' + rowYear;
-            
-            Logger.log(`📊 Date karşılaştırma: "${rowMonthStr}" === "${currentMonthStr}"?`);
-            
-            if (rowMonthStr === currentMonthStr) {
-              monthlyCount = row[1] || 0; // Bu ayın toplamı
-              Logger.log('✅ Bu ayki bakımlar bulundu (Date): ' + monthlyCount);
-              break;
-            }
-          }
-          // Eğer string ise eski yöntemle karşılaştır
-          else if (row[0] && row[0].toString().includes(currentMonthStr)) {
-            monthlyCount = row[1] || 0; // Bu ayın toplamı
-            Logger.log('✅ Bu ayki bakımlar bulundu (String): ' + monthlyCount);
-            break;
-          }
-        }
-        
-        Logger.log('📊 Sonuç - Bu ayki bakımlar: ' + monthlyCount);
-      }
-    } else {
-      Logger.log('⚠️ İstatistikler sayfası bulunamadı, manuel sayım yapılıyor...');
-      
-      // İstatistikler sayfası yoksa eski yöntemle say
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-      
-      // Yardımcı fonksiyon: Sayfadaki kayıtları say
-      function countRecords(sheet, typeFilter) {
-        if (!sheet) return;
-        
-        const lastRow = sheet.getLastRow();
-        if (lastRow <= 1) return;
-        
-        const data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
-        
-        for (let i = 0; i < data.length; i++) {
-          const row = data[i];
-          
-          // Tarih kontrolü
-          if (row[1] && row[1] !== "") {
-            try {
-              const recordDate = parseTurkishDate(row[1]);
-              if (recordDate && !isNaN(recordDate.getTime())) {
-                totalMaintenance++;
-                
-                // Bu ayki bakımlar
-                if (recordDate.getMonth() === currentMonth && recordDate.getFullYear() === currentYear) {
-                  monthlyCount++;
-                }
-              }
-            } catch (e) {
-              Logger.log('❌ Tarih hatası: ' + row[1]);
-            }
-          }
-          
-          // Arıza sayısı
-          if (typeFilter === 'fault' && row[5]) {
-            faultCount++;
-          }
-          
-          // Teknisyen ekle
-          if (row[5]) {
-            technicians.add(row[5]);
-          }
-        }
-      }
-      
-      // Tüm sayfalardan kayıtları say
-      countRecords(periodicSheet, 'periodic');
-      countRecords(normalSheet, 'normal');
-      countRecords(faultSheet, 'fault');
-    }
-    
-    Logger.log('📊 Son İstatistikler: Toplam=' + totalMaintenance + ', Aylık=' + monthlyCount + ', Arıza=' + faultCount + ', Teknisyen=' + technicians.size);
-    
-    const stats = {
-      total: totalMaintenance,
-      monthly: monthlyCount,
-      faults: faultCount,
-      technicians: technicians.size
-    };
-    
-    // Grafik verisi - İstatistikler sayfasından oku
-    let period = 6;
-    if (params && params.period) {
-      period = parseInt(params.period);
-    }
-    
-    const chartData = generateChartDataFromStatisticsSheet(statsSheet, period);
-    
-    return createResponse(true, "İstatistikler alındı", {
-      stats: stats,
-      chartData: chartData
-    });
-    
-  } catch (error) {
-    Logger.log('❌ getMaintenanceStats hatası: ' + error.toString());
-    return createResponse(true, "Henüz veri yok", {
-      stats: { total: 0, monthly: 0, faults: 0, technicians: 0 },
-      chartData: { 
-        labels: ['Oca.2026', 'Şub.2026', 'Mar.2026', 'Nis.2026', 'May.2026', 'Haz.2026'], 
-        periodic: [0, 0, 0, 0, 0, 0],
-        normal: [0, 0, 0, 0, 0, 0],
-        fault: [0, 0, 0, 0, 0, 0]
-      }
-    });
-  }
+function normalizeMainType(value) {
+  const text = normalizeSearchText(value);
+  if (text.indexOf('PERIYODIK') !== -1) return 'Periyodik';
+  if (text.indexOf('ARIZA') !== -1) return 'Ariza';
+  return 'Normal';
 }
 
-// Grafik verisi oluştur - İstatistikler sayfasından oku
-function generateChartDataFromStatisticsSheet(statsSheet, period = 6) {
-  Logger.log('📊 generateChartDataFromStatisticsSheet başlatıldı - Periyot: ' + period);
-  
-  const labels = [];
-  const periodicData = [];
-  const normalData = [];
-  const faultData = [];
-  const months = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-  
-  if (!statsSheet) {
-    Logger.log('⚠️ İstatistikler sayfası yok, boş grafik verisi dönülüyor');
-    return {
-      labels: labels,
-      periodic: periodicData,
-      normal: normalData,
-      fault: faultData
-    };
-  }
-  
-  // İstatistikler sayfasından verileri oku
-  const lastRow = statsSheet.getLastRow();
-  if (lastRow <= 1) {
-    Logger.log('⚠️ İstatistikler sayfasında veri yok');
-    return {
-      labels: labels,
-      periodic: periodicData,
-      normal: normalData,
-      fault: faultData
-    };
-  }
-  
-  const statsData = statsSheet.getRange(2, 1, lastRow - 1, 8).getValues();
-  Logger.log('📊 İstatistikler sayfasından ' + statsData.length + ' satır okundu');
-  
-  // Tüm satırları logla
-  for (let k = 0; k < statsData.length; k++) {
-    const row = statsData[k];
-    Logger.log('📊 Satır ' + (k+2) + ': "' + (row[0] || 'NULL') + '" -> Periyodik=' + (row[2] || 0) + ', Normal=' + (row[3] || 0) + ', Arıza=' + (row[4] || 0));
-  }
-  
-  // Belirtilen periyot kadar ayın verisini al
-  for (let i = period - 1; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const monthStr = months[date.getMonth()];
-    const yearStr = date.getFullYear().toString();
-    
-    // Türkçe format: "Oca.2026"
-    labels.push(monthStr + '.' + yearStr);
-    
-    // İstatistikler sayfasından bu ayın verisini bul
-    const currentMonthStr = (date.getMonth() + 1).toString().padStart(2, '0') + '.' + date.getFullYear();
-    let periodicCount = 0;
-    let normalCount = 0;
-    let faultCount = 0;
-    
-    Logger.log('📊 Aranan ay: ' + currentMonthStr);
-    
-    for (let j = 0; j < statsData.length; j++) {
-      const row = statsData[j];
-      const rowDate = row[0];
-      
-      Logger.log('📊 Karşılaştırma: "' + rowDate + '" === "' + currentMonthStr + '"?');
-      
-      // Eğer rowDate bir Date objesi ise, ay ve yılı karşılaştır
-      if (rowDate && typeof rowDate === 'object' && rowDate.getMonth) {
-        const rowMonth = (rowDate.getMonth() + 1).toString().padStart(2, '0');
-        const rowYear = rowDate.getFullYear().toString();
-        const rowMonthStr = rowMonth + '.' + rowYear;
-        
-        Logger.log('📊 Date karşılaştırma: "' + rowMonthStr + '" === "' + currentMonthStr + '"?');
-        
-        if (rowMonthStr === currentMonthStr) {
-          periodicCount = row[2] || 0; // Periyodik sütunu
-          normalCount = row[3] || 0;   // Normal sütunu
-          faultCount = row[4] || 0;    // Arıza sütunu
-          Logger.log('✅ ' + currentMonthStr + ' için veriler bulundu: Periyodik=' + periodicCount + ', Normal=' + normalCount + ', Arıza=' + faultCount);
-          break;
-        }
-      }
-      // Eğer string ise eski yöntemle karşılaştır
-      else if (rowDate && (rowDate.toString() === currentMonthStr || rowDate.toString().includes(currentMonthStr))) {
-        periodicCount = row[2] || 0; // Periyodik sütunu
-        normalCount = row[3] || 0;   // Normal sütunu
-        faultCount = row[4] || 0;    // Arıza sütunu
-        Logger.log('✅ ' + currentMonthStr + ' için veriler bulundu (string): Periyodik=' + periodicCount + ', Normal=' + normalCount + ', Arıza=' + faultCount);
-        break;
-      }
-    }
-    
-    Logger.log('📊 ' + currentMonthStr + ' sonuç: Periyodik=' + periodicCount + ', Normal=' + normalCount + ', Arıza=' + faultCount);
-    
-    // Verileri ekle
-    periodicData.push(periodicCount);
-    normalData.push(normalCount);
-    faultData.push(faultCount);
-  }
-  
-  Logger.log('📊 Grafik verisi İstatistikler sayfasından oluşturuldu');
-  Logger.log('📈 Periyodik: ' + periodicData.join(','));
-  Logger.log('📈 Normal: ' + normalData.join(','));
-  Logger.log('📈 Arıza: ' + faultData.join(','));
-  
+function normalizeSubtype(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Diger';
+  return raw.toUpperCase();
+}
+
+function normalizeSupportType(value) {
+  const text = normalizeSearchText(value);
+  if (text.indexOf('DIS') !== -1 || text.indexOf('EXTERNAL') !== -1) return 'Dis destek';
+  return 'Ic destek';
+}
+
+function normalizeStatus(value) {
+  const text = normalizeSearchText(value);
+  if (text.indexOf('KAPALI') !== -1 || text.indexOf('PASIF') !== -1) return 'Kapali';
+  return 'Aktif';
+}
+
+function normalizeMotor(value) {
+  let text = String(value || 'GM-1').trim().toUpperCase().replace(/\s+/g, '');
+  const match = text.match(/GM-?(\d+)$/);
+  if (match) return 'GM-' + match[1];
+  if (/^\d+$/.test(text)) return 'GM-' + text;
+  return text || 'GM-1';
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .replace(/\u0131/g, 'i')
+    .replace(/\u0130/g, 'I')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function createRecordNo(ss, mainType) {
+  const prefix = mainType === 'Periyodik' ? 'PB' : mainType === 'Ariza' ? 'AB' : 'NB';
+  const settings = ensureSettingsSheet(ss);
+  const lastValue = String(settings.getRange(2, 2).getValue() || '');
+  const lastNumber = parseInt((lastValue.match(/(\d+)$/) || [0, 0])[1], 10) || 0;
+  const recordNo = prefix + '-' + String(lastNumber + 1).padStart(5, '0');
+  return recordNo;
+}
+
+function updateLastRecordNo(ss, recordNo) {
+  ensureSettingsSheet(ss).getRange(2, 1, 1, 2).setValues([['Son Kayit No', recordNo]]);
+}
+
+function calculatePeriodicPlan(currentHours) {
+  const current = parseNumber(currentHours);
+  const lastThreshold = current > 0 ? Math.floor(current / PERIODIC_STEP_HOURS) * PERIODIC_STEP_HOURS : 0;
+  const nextThreshold = current > 0 && current % PERIODIC_STEP_HOURS === 0
+    ? current
+    : (Math.floor(current / PERIODIC_STEP_HOURS) + 1) * PERIODIC_STEP_HOURS;
+  const remainingHours = Math.max(0, nextThreshold - current);
+  const nextMaintenanceType = getPeriodicTypeForThreshold(nextThreshold);
+  const lastMaintenanceType = getPeriodicTypeForThreshold(lastThreshold);
+
   return {
-    labels: labels,
-    periodic: periodicData,
-    normal: normalData,
-    fault: faultData
+    currentHours: current,
+    lastThreshold: lastThreshold,
+    lastMaintenanceType: String(lastMaintenanceType),
+    nextThreshold: nextThreshold,
+    nextMaintenanceType: String(nextMaintenanceType),
+    remainingHours: remainingHours,
+    needsMaintenance: remainingHours === 0,
+    warnsMaintenance: remainingHours > 0 && remainingHours <= PERIODIC_WARNING_HOURS,
+    warningLimit: PERIODIC_WARNING_HOURS,
+    planDetail: 'Baz ' + PERIODIC_BASE_HOURS + ', adim ' + PERIODIC_STEP_HOURS
   };
 }
 
-// Rapor al - Ayrı sayfalardan oku
-function getMaintenanceReport(ss, params) {
+function getPeriodicTypeForThreshold(threshold) {
+  const value = parseNumber(threshold);
+  if (!value) return PERIODIC_STEP_HOURS;
+
+  let basis = value > PERIODIC_BASE_HOURS ? value - PERIODIC_BASE_HOURS : value;
+  if (!basis) basis = value;
+
+  for (let i = 0; i < PERIODIC_INTERVALS.length; i++) {
+    if (basis % PERIODIC_INTERVALS[i] === 0) return PERIODIC_INTERVALS[i];
+  }
+  return PERIODIC_STEP_HOURS;
+}
+
+function getPeriodicWarningStatus(plan) {
+  if (plan.needsMaintenance) return 'Bakim zamani geldi';
+  if (plan.remainingHours > 0 && plan.remainingHours <= PERIODIC_URGENT_WARNING_HOURS) return PERIODIC_URGENT_WARNING_HOURS + ' saat kala tekrar uyarildi';
+  if (plan.warnsMaintenance) return PERIODIC_WARNING_HOURS + ' saat kala uyarildi';
+  return 'Normal';
+}
+
+function getPeriodicMaintenanceStatus(ss) {
+  ss = ss || getSpreadsheet();
+  const motors = MOTORS.map(function(motor) {
+    ensureRecordSheet(ss, 'Periyodik ' + motor);
+    const currentHours = getLatestEnergyMotorHours(ss, motor);
+    const plan = calculatePeriodicPlan(currentHours);
+    const mail = sendPeriodicMaintenanceEmailIfNeeded(motor, plan);
+    return Object.assign({ motor: motor, mail: mail }, plan);
+  });
+
+  return jsonResponse(true, 'Periyodik bakim durumu getirildi', { motors: motors });
+}
+
+function sendPeriodicMaintenanceEmailIfNeeded(motor, plan) {
   try {
-    // Ayrı bakım sayfalarını al
-    const periodicSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    const normalSheet = ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE);
-    const faultSheet = ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE);
-    
-    // Filtreleme parametreleri
-    let motor = (Array.isArray(params.motor) ? params.motor[0] : params.motor) || '';
-    let type = (Array.isArray(params.type) ? params.type[0] : params.type) || '';
-    const range = parseInt(Array.isArray(params.range) ? params.range[0] : params.range) || 30;
-    
-    // Tür filtresi mapping
-    const typeMapping = {
-      'periodic': 'Periyodik',
-      'normal': 'Normal',
-      'fault': 'Arıza'
-    };
-    
-    if (type && typeMapping[type.toLowerCase()]) {
-      type = typeMapping[type.toLowerCase()];
+    if (!plan.needsMaintenance && !plan.warnsMaintenance) {
+      return { sent: false, skipped: true };
     }
-    
-    Logger.log('Rapor filtresi - Motor: ' + motor + ', Tip: ' + type + ', Aralık: ' + range);
-    
-    // Tarih aralığı
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - range);
-    
-    const records = [];
-    let summary = { total: 0, periodic: 0, normal: 0, fault: 0 };
-    
-    // Yardımcı fonksiyon: Sayfadan kayıtları oku
-    function readRecords(sheet, typeLabel) {
-      if (!sheet) return;
-      
-      const lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return;
-      
-      // Son kayıttan başlayarak geriye doğru oku
-      for (let i = lastRow; i >= 2; i--) {
-        const row = sheet.getRange(i, 1, 1, 12).getValues()[0];
-        
-        if (!row[1]) continue; // Tarih yoksa atla
-        
-        try {
-          const recordDate = parseTurkishDate(row[1]);
-          
-          // Tarih aralığı kontrolü
-          if (recordDate && recordDate >= startDate && recordDate <= endDate) {
-            // Motor filtresi
-            if (motor && row[2] && !String(row[2]).toLowerCase().includes(motor.toLowerCase())) {
-              continue;
-            }
-            
-            // Tür filtresi
-            if (type && !typeLabel.toLowerCase().includes(type.toLowerCase())) {
-              continue;
-            }
-            
-            // Özeti güncelle
-            summary.total++;
-            if (typeLabel === 'Periyodik') summary.periodic++;
-            else if (typeLabel === 'Normal') summary.normal++;
-            else if (typeLabel === 'Arıza') summary.fault++;
-            
-            // Kayıt ekle
-            records.push({
-              date: row[1],
-              motor: row[2],
-              type: typeLabel,
-              technician: row[5],
-              operation: row[4] || row[7]
-            });
-          }
-        } catch (e) {
-          Logger.log('Tarih hatası: ' + row[1]);
-        }
-      }
-    }
-    
-    // Tüm sayfalardan kayıtları oku
-    readRecords(periodicSheet, 'Periyodik');
-    readRecords(normalSheet, 'Normal');
-    readRecords(faultSheet, 'Arıza');
-    
-    return createResponse(true, "Rapor oluşturuldu", {
-      summary: summary,
-      records: records.reverse() // Tarih sırasına göre
+
+    const props = PropertiesService.getScriptProperties();
+    const warningStage = getPeriodicWarningStage(plan);
+    const key = 'periodic:' + motor + ':' + plan.nextThreshold + ':' + plan.nextMaintenanceType + ':' + warningStage;
+    if (props.getProperty(key)) return { sent: false, skipped: true, reason: 'sent-before' };
+
+    MailApp.sendEmail({
+      to: getAlertEmail(),
+      subject: 'Periyodik Bakim Uyarisi - ' + motor,
+      body: [
+        'Periyodik Bakim Uyarisi',
+        '',
+        'Motor: ' + motor,
+        'Guncel calisma saati: ' + plan.currentHours,
+        'Bakim tipi: ' + plan.nextMaintenanceType + ' saat',
+        'Bakim esigi: ' + plan.nextThreshold,
+        'Kalan saat: ' + plan.remainingHours,
+        'Uyari kademesi: ' + warningStage
+      ].join('\n')
     });
-    
+
+    props.setProperty(key, new Date().toISOString());
+    return { sent: true, stage: warningStage };
   } catch (error) {
-    throw new Error('Rapor alınamadı: ' + error.toString());
+    Logger.log('Mail gonderilemedi: ' + error.toString());
+    return { sent: false, error: error.toString() };
   }
 }
 
-// Aktif kayıtları getir - Ayrı sayfalardan oku
-function getActiveRecords(ss, params) {
-  try {
-    // Ayrı bakım sayfalarını al
-    const periodicSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    const normalSheet = ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE);
-    const faultSheet = ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE);
-    
-    // Filtreleme parametreleri
-    const motor = (Array.isArray(params.motor) ? params.motor[0] : params.motor) || '';
-    const type = (Array.isArray(params.type) ? params.type[0] : params.type) || '';
-    
-    Logger.log('Aktif kayıtlar filtresi - Motor: ' + motor + ', Tip: ' + type);
-    
-    const records = [];
-    
-    // Yardımcı fonksiyon: Sayfadan aktif kayıtları oku
-    function readActiveRecords(sheet, typeLabel) {
-      if (!sheet) return;
-      
-      const lastRow = sheet.getLastRow();
-      if (lastRow <= 1) return;
-      
-      const data = sheet.getRange(2, 1, lastRow - 1, 12).getValues();
-      
-      for (let i = 0; i < data.length; i++) {
-        const row = data[i];
-        const recordStatus = row[9]; // Durum sütunu (10. sütun, index 9)
-        
-        // Sadece Aktif kayıtları göster
-        if (recordStatus !== 'Aktif') continue;
-        
-        const recordMotor = row[2]; // Motor (3. sütun, index 2)
-        
-        // Motor filtresi
-        if (motor && recordMotor !== motor) continue;
-        
-        // Tür filtresi (sayfa türüne göre)
-        if (type && !typeLabel.toLowerCase().includes(type.toLowerCase())) continue;
-        
-        records.push({
-          recordNo: row[0],
-          date: row[1],
-          motor: recordMotor,
-          type: typeLabel,
-          subtype: row[4],
-          technician: row[5],
-          company: row[6],
-          notes: row[7],
-          files: row[8],
-          status: recordStatus,
-          timestamp: row[10]
-        });
-      }
-    }
-    
-    // Tüm sayfalardan aktif kayıtları oku
-    readActiveRecords(periodicSheet, 'Periyodik');
-    readActiveRecords(normalSheet, 'Normal');
-    readActiveRecords(faultSheet, 'Arıza');
-    
-    Logger.log('Bulunan aktif kayıt sayısı: ' + records.length);
-    
-    return createResponse(true, 'Aktif kayıtlar getirildi', { records: records });
-    
-  } catch (error) {
-    Logger.log('Aktif kayıtlar getirilirken hata: ' + error.toString());
-    return createResponse(false, 'Kayıtlar getirilemedi: ' + error.toString());
-  }
+function getPeriodicWarningStage(plan) {
+  if (plan.needsMaintenance) return 'due';
+  if (plan.remainingHours > 0 && plan.remainingHours <= PERIODIC_URGENT_WARNING_HOURS) return 'urgent-' + PERIODIC_URGENT_WARNING_HOURS;
+  return 'warning-' + PERIODIC_WARNING_HOURS;
 }
 
-// Kayıt kapat - Kayıt prefixine göre doğru sayfayı bul
-function closeRecord(ss, params) {
-  try {
-    const recordNo = (Array.isArray(params.recordNo) ? params.recordNo[0] : params.recordNo) || '';
-    
-    if (!recordNo) {
-      return createResponse(false, 'Kayıt numarası belirtilmedi');
-    }
-    
-    Logger.log('Kayıt kapatılıyor: ' + recordNo);
-    
-    // Kayıt prefixine göre doğru sayfayı belirle
-    let targetSheet;
-    if (recordNo.startsWith('PB-')) {
-      targetSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    } else if (recordNo.startsWith('NB-')) {
-      targetSheet = ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE);
-    } else if (recordNo.startsWith('AB-')) {
-      targetSheet = ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE);
-    } else {
-      // Eski BK- formatı veya bilinmeyen prefix - tüm sayfalarda ara
-      targetSheet = ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE);
-    }
-    
-    if (!targetSheet) {
-      return createResponse(false, 'Bakım sayfası bulunamadı');
-    }
-    
-    let foundRow = -1;
-    let sheetName = '';
-    
-    // Önce belirlenen sayfada ara
-    const lastRow = targetSheet.getLastRow();
-    if (lastRow > 1) {
-      const data = targetSheet.getRange(2, 1, lastRow - 1, 1).getValues();
-      for (let i = 0; i < data.length; i++) {
-        if (data[i][0] === recordNo) {
-          foundRow = i + 2;
-          sheetName = targetSheet.getName();
-          break;
-        }
-      }
-    }
-    
-    // Bulunamazsa diğer sayfalarda da ara
-    if (foundRow === -1) {
-      const sheets = [
-        ss.getSheetByName(SHEET_NAMES.PERIODIC_MAINTENANCE),
-        ss.getSheetByName(SHEET_NAMES.NORMAL_MAINTENANCE),
-        ss.getSheetByName(SHEET_NAMES.FAULT_MAINTENANCE)
-      ];
-      
-      for (const sheet of sheets) {
-        if (!sheet || sheet.getName() === targetSheet.getName()) continue;
-        
-        const lr = sheet.getLastRow();
-        if (lr <= 1) continue;
-        
-        const data = sheet.getRange(2, 1, lr - 1, 1).getValues();
-        for (let i = 0; i < data.length; i++) {
-          if (data[i][0] === recordNo) {
-            foundRow = i + 2;
-            sheetName = sheet.getName();
-            targetSheet = sheet;
-            break;
-          }
-        }
-        if (foundRow !== -1) break;
-      }
-    }
-    
-    if (foundRow === -1) {
-      return createResponse(false, 'Kayıt bulunamadı: ' + recordNo);
-    }
-    
-    // Durum sütununu güncelle (10. sütun, index 9)
-    targetSheet.getRange(foundRow, 10).setValue('Pasif');
-    targetSheet.getRange(foundRow, 11).setValue(new Date().toLocaleString('tr-TR'));
-    
-    Logger.log('Kayıt kapatıldı: ' + recordNo + ' (Sayfa: ' + sheetName + ', Satır: ' + foundRow + ')');
-    
-    return createResponse(true, 'Kayıt başarıyla kapatıldı', { 
-      recordNo: recordNo,
-      closedAt: new Date().toLocaleString('tr-TR')
-    });
-    
-  } catch (error) {
-    Logger.log('Kayıt kapatılırken hata: ' + error.toString());
-    return createResponse(false, 'Kayıt kapatılamadı: ' + error.toString());
+function getAlertEmail() {
+  const fromProps = PropertiesService.getScriptProperties().getProperty(ALERT_EMAIL_PROPERTY);
+  if (fromProps) return fromProps;
+
+  const settings = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_SETTINGS);
+  if (settings) {
+    const value = settings.getRange(3, 2).getValue();
+    if (value) return String(value);
   }
-}
-
-function getMotorHoursV2(ss) {
-  try {
-    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-    if (!sheet) {
-      return createResponse(false, 'Motor Saatleri sayfasi bulunamadi');
-    }
-
-    const data = sheet.getRange(2, 1, 3, 10).getValues();
-    const motors = [];
-
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const motorName = row[0];
-      const energyHours = getLatestEnergyMotorHours(ss, motorName);
-      const currentHours = energyHours > 0 ? energyHours : parseBakimNumber(row[1]);
-      if (energyHours > 0 && parseBakimNumber(row[1]) !== energyHours) {
-        sheet.getRange(i + 2, 2).setValue(energyHours);
-      }
-
-      const lastOilSample = parseBakimNumber(row[2]);
-      const nextOilSample = parseBakimNumber(row[4]) || (lastOilSample + OIL_SAMPLE_INTERVAL_HOURS);
-      const oilElapsedHours = Math.max(0, currentHours - lastOilSample);
-      const remainingOilHours = Math.max(0, OIL_SAMPLE_INTERVAL_HOURS - oilElapsedHours);
-      const needsOilSample = oilElapsedHours >= OIL_SAMPLE_INTERVAL_HOURS;
-      const warnsOilSample = oilElapsedHours >= OIL_SAMPLE_WARNING_HOURS && !needsOilSample;
-
-      const lastAlternatorGrease = parseBakimNumber(row[6]);
-      const nextAlternatorGrease = parseBakimNumber(row[8]) || (lastAlternatorGrease + ALTERNATOR_GREASE_INTERVAL_HOURS);
-      const alternatorElapsedHours = Math.max(0, currentHours - lastAlternatorGrease);
-      const remainingAltHours = Math.max(0, ALTERNATOR_GREASE_INTERVAL_HOURS - alternatorElapsedHours);
-      const needsAlternatorGrease = alternatorElapsedHours >= ALTERNATOR_GREASE_INTERVAL_HOURS;
-      const warnsAlternatorGrease = alternatorElapsedHours >= ALTERNATOR_GREASE_WARNING_HOURS && !needsAlternatorGrease;
-
-      motors.push({
-        motor: motorName,
-        currentHours: currentHours,
-        currentHoursSource: energyHours > 0 ? 'Enerji' : 'Motor Saatleri',
-        lastOilSampleHours: lastOilSample,
-        lastOilSampleDate: row[3],
-        nextOilSampleHours: nextOilSample,
-        oilElapsedHours: oilElapsedHours,
-        remainingOilHours: remainingOilHours,
-        needsOilSample: needsOilSample,
-        warnsOilSample: warnsOilSample,
-        notes: row[5],
-        lastAlternatorGreaseHours: lastAlternatorGrease,
-        lastAlternatorGreaseDate: row[7],
-        nextAlternatorGreaseHours: nextAlternatorGrease,
-        alternatorElapsedHours: alternatorElapsedHours,
-        remainingAltHours: remainingAltHours,
-        needsAlternatorGrease: needsAlternatorGrease,
-        warnsAlternatorGrease: warnsAlternatorGrease,
-        alternatorNotes: row[9]
-      });
-    }
-
-    return createResponse(true, 'Motor saatleri getirildi', { motors: motors });
-  } catch (error) {
-    Logger.log('Motor saatleri getirilirken hata: ' + error.toString());
-    return createResponse(false, 'Motor saatleri getirilemedi: ' + error.toString());
-  }
+  return DEFAULT_ALERT_EMAIL;
 }
 
 function getLatestEnergyMotorHours(ss, motor) {
-  const localHours = getLatestEnergyMotorHoursFromSheets(ss, motor);
-  if (localHours > 0) return localHours;
+  ss = ss || getSpreadsheet();
+  const local = getLatestEnergyMotorHoursFromSheets(ss, motor);
+  if (local > 0) return local;
   return getLatestEnergyMotorHoursFromApi(motor);
 }
 
 function getLatestEnergyMotorHoursFromSheets(ss, motor) {
-  const normalizedMotor = normalizeBakimMotorLabel(motor);
-  const sheetNames = [
-    'Enerji GM-' + normalizedMotor,
-    'Enerji ' + normalizedMotor,
-    'Enerji ' + String(normalizedMotor || '').replace('-', ' '),
-    'Enerji ' + String(motor || '').trim()
-  ];
-  const seenSheetNames = {};
+  ss = ss || getSpreadsheet();
+  const normalized = normalizeMotor(motor);
+  const names = ['Enerji ' + normalized, 'Enerji GM-' + normalized.replace('GM-', ''), 'Enerji ' + normalized.replace('-', ' ')];
 
-  for (let i = 0; i < sheetNames.length; i++) {
-    if (seenSheetNames[sheetNames[i]]) continue;
-    seenSheetNames[sheetNames[i]] = true;
-
-    const sheet = ss.getSheetByName(sheetNames[i]);
+  for (let i = 0; i < names.length; i++) {
+    const sheet = ss.getSheetByName(names[i]);
     if (!sheet || sheet.getLastRow() < 2) continue;
 
-    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getDisplayValues();
-    for (let rowIndex = rows.length - 1; rowIndex >= 0; rowIndex--) {
-      const hours = parseBakimNumber(rows[rowIndex][13]);
+    const values = sheet.getRange(2, 14, sheet.getLastRow() - 1, 1).getDisplayValues();
+    for (let r = values.length - 1; r >= 0; r--) {
+      const hours = parseNumber(values[r][0]);
       if (hours > 0) return hours;
     }
   }
-
   return 0;
 }
 
 function getLatestEnergyMotorHoursFromApi(motor) {
   try {
-    const response = UrlFetchApp.fetch(KOJEN_ENERJI_API_URL + '?action=getLastRecords&count=120', {
+    const response = UrlFetchApp.fetch(KOJEN_ENERJI_API_URL + '?action=getLastRecords&count=150', {
       method: 'get',
       muteHttpExceptions: true
     });
-
     if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return 0;
 
     const payload = JSON.parse(response.getContentText());
     if (!payload.success || !payload.data) return 0;
 
-    const normalizedMotor = normalizeBakimMotorLabel(motor);
+    const normalized = normalizeMotor(motor);
     for (let i = 0; i < payload.data.length; i++) {
       const record = payload.data[i];
-      if (normalizeBakimMotorLabel(record.motor) === normalizedMotor) {
-        return parseBakimNumber(record.calismaSaati);
+      if (normalizeMotor(record.motor) === normalized) {
+        return parseNumber(record.calismaSaati);
       }
     }
   } catch (error) {
-    Logger.log('Enerji motor saati alinamadi: ' + error.toString());
+    Logger.log('Enerji API okunamadi: ' + error.toString());
   }
-
   return 0;
 }
 
-function normalizeBakimMotorLabel(motor) {
-  let value = String(motor || 'GM-1').trim().toUpperCase();
-  if (!value) return 'GM-1';
-  value = value.replace(/\s+/g, '');
+function getMotorHours(ss) {
+  ss = ss || getSpreadsheet();
+  const motors = MOTORS.map(function(motor) {
+    const currentHours = getLatestEnergyMotorHours(ss, motor);
+    const lastOil = getLastOilSampleHours(ss, motor);
+    const lastAlt = getLastAlternatorGreaseHours(ss, motor);
+    const oilPlan = calculateOilSamplePlan(currentHours, lastOil);
+    const altPlan = calculateAlternatorGreasePlan(currentHours, lastAlt);
 
-  const gmMatch = value.match(/GM-?(\d+)$/);
-  if (gmMatch) return 'GM-' + gmMatch[1];
-  if (/^\d+$/.test(value)) return 'GM-' + value;
-  return value;
+    return {
+      motor: motor,
+      currentHours: currentHours,
+      currentHoursSource: 'Enerji',
+      lastOilSampleHours: lastOil,
+      nextOilSampleHours: oilPlan.nextHours,
+      remainingOilHours: oilPlan.remainingHours,
+      needsOilSample: oilPlan.needsMaintenance,
+      warnsOilSample: oilPlan.warnsMaintenance,
+      warnsOilSampleUrgent: oilPlan.warnsUrgent,
+      oilSampleBasis: oilPlan.basis,
+      lastAlternatorGreaseHours: lastAlt,
+      nextAlternatorGreaseHours: altPlan.nextHours,
+      remainingAltHours: altPlan.remainingHours,
+      needsAlternatorGrease: altPlan.needsMaintenance,
+      warnsAlternatorGrease: altPlan.warnsMaintenance,
+      alternatorGreaseBasis: altPlan.basis
+    };
+  });
+  writeSettingsMotorHours(ss, motors);
+  writeSettingsAlternatorGreaseTable(ss, motors);
+  writeSettingsOilSampleTable(ss, motors);
+  return jsonResponse(true, 'Motor saatleri getirildi', { motors: motors });
 }
 
-function parseBakimNumber(value) {
-  if (value === null || value === undefined || value === '') return 0;
-  if (typeof value === 'number') return value;
+function calculateOilSamplePlan(currentHours, lastSampleHours) {
+  const current = parseNumber(currentHours);
+  const last = parseNumber(lastSampleHours);
+  let next = 0;
+  let basis = 'kayit-yok';
 
-  let normalized = String(value).trim();
-  if (normalized.indexOf(',') !== -1) {
-    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  if (last > 0) {
+    next = last + OIL_SAMPLE_INTERVAL_HOURS;
+    basis = 'son-yag-numune-kaydi';
   }
 
-  const parsed = parseFloat(normalized);
+  const remaining = next > 0 ? Math.max(0, next - current) : '';
+
+  return {
+    currentHours: current,
+    lastSampleHours: last,
+    nextHours: next,
+    remainingHours: remaining,
+    needsMaintenance: next > 0 && remaining === 0,
+    warnsMaintenance: next > 0 && remaining > 0 && remaining <= OIL_SAMPLE_WARNING_HOURS,
+    warnsUrgent: next > 0 && remaining > 0 && remaining <= OIL_SAMPLE_URGENT_WARNING_HOURS,
+    warningLimit: OIL_SAMPLE_WARNING_HOURS,
+    urgentWarningLimit: OIL_SAMPLE_URGENT_WARNING_HOURS,
+    intervalHours: OIL_SAMPLE_INTERVAL_HOURS,
+    basis: basis
+  };
+}
+
+function checkOilSampleAlerts(ss) {
+  ss = ss || getSpreadsheet();
+  const motors = MOTORS.map(function(motor) {
+    const currentHours = getLatestEnergyMotorHours(ss, motor);
+    const lastOil = getLastOilSampleHours(ss, motor);
+    const plan = calculateOilSamplePlan(currentHours, lastOil);
+    const mail = sendOilSampleEmailIfNeeded(motor, plan);
+    return Object.assign({ motor: motor, mail: mail }, plan);
+  });
+
+  return jsonResponse(true, 'Yag numune uyarilari kontrol edildi', { motors: motors });
+}
+
+function sendOilSampleEmailIfNeeded(motor, plan) {
+  try {
+    if (!plan.needsMaintenance && !plan.warnsMaintenance) {
+      return { sent: false, skipped: true };
+    }
+
+    const stage = plan.needsMaintenance
+      ? 'due'
+      : plan.remainingHours <= OIL_SAMPLE_URGENT_WARNING_HOURS
+        ? 'urgent-' + OIL_SAMPLE_URGENT_WARNING_HOURS
+        : 'warning-' + OIL_SAMPLE_WARNING_HOURS;
+    const props = PropertiesService.getScriptProperties();
+    const key = 'oilSample:' + motor + ':' + plan.nextHours + ':' + stage;
+    if (props.getProperty(key)) return { sent: false, skipped: true, reason: 'sent-before', stage: stage };
+
+    MailApp.sendEmail({
+      to: getAlertEmail(),
+      subject: 'Yag Numune Uyarisi - ' + motor,
+      body: [
+        'Yag Numune Uyarisi',
+        '',
+        'Motor: ' + motor,
+        'Guncel calisma saati: ' + plan.currentHours,
+        'Son yag numune saati: ' + (plan.lastSampleHours || 'Kayit yok'),
+        'Numune araligi: ' + plan.intervalHours + ' saat',
+        'Sonraki numune esigi: ' + plan.nextHours,
+        'Kalan saat: ' + plan.remainingHours,
+        'Uyari kademesi: ' + stage,
+        'Hesap kaynagi: ' + plan.basis
+      ].join('\n')
+    });
+
+    props.setProperty(key, new Date().toISOString());
+    return { sent: true, stage: stage };
+  } catch (error) {
+    Logger.log('Yag numune maili gonderilemedi: ' + error.toString());
+    return { sent: false, error: error.toString() };
+  }
+}
+
+function calculateAlternatorGreasePlan(currentHours, lastGreaseHours) {
+  const current = parseNumber(currentHours);
+  const last = parseNumber(lastGreaseHours);
+  let next = 0;
+  let basis = 'kayit-yok';
+
+  if (last > 0) {
+    next = last + ALTERNATOR_GREASE_INTERVAL_HOURS;
+    basis = 'son-gresleme-kaydi';
+  } else if (current > 0) {
+    next = Math.ceil(current / ALTERNATOR_GREASE_INTERVAL_HOURS) * ALTERNATOR_GREASE_INTERVAL_HOURS;
+    if (!next) next = ALTERNATOR_GREASE_INTERVAL_HOURS;
+    basis = 'motor-saati-esigi';
+  }
+
+  const remaining = next > 0 ? Math.max(0, next - current) : ALTERNATOR_GREASE_INTERVAL_HOURS;
+
+  return {
+    currentHours: current,
+    lastGreaseHours: last,
+    nextHours: next,
+    remainingHours: remaining,
+    needsMaintenance: next > 0 && remaining === 0,
+    warnsMaintenance: next > 0 && remaining > 0 && remaining <= ALTERNATOR_GREASE_WARNING_HOURS,
+    warningLimit: ALTERNATOR_GREASE_WARNING_HOURS,
+    intervalHours: ALTERNATOR_GREASE_INTERVAL_HOURS,
+    basis: basis
+  };
+}
+
+function checkAlternatorGreaseAlerts(ss) {
+  ss = ss || getSpreadsheet();
+  const motors = MOTORS.map(function(motor) {
+    const currentHours = getLatestEnergyMotorHours(ss, motor);
+    const lastAlt = getLastAlternatorGreaseHours(ss, motor);
+    const plan = calculateAlternatorGreasePlan(currentHours, lastAlt);
+    const mail = sendAlternatorGreaseEmailIfNeeded(motor, plan);
+    return Object.assign({ motor: motor, mail: mail }, plan);
+  });
+
+  return jsonResponse(true, 'Alternator gresleme uyarilari kontrol edildi', { motors: motors });
+}
+
+function sendAlternatorGreaseEmailIfNeeded(motor, plan) {
+  try {
+    if (!plan.needsMaintenance && !plan.warnsMaintenance) {
+      return { sent: false, skipped: true };
+    }
+
+    const stage = plan.needsMaintenance ? 'due' : 'warning-' + ALTERNATOR_GREASE_WARNING_HOURS;
+    const props = PropertiesService.getScriptProperties();
+    const key = 'alternatorGrease:' + motor + ':' + plan.nextHours + ':' + stage;
+    if (props.getProperty(key)) return { sent: false, skipped: true, reason: 'sent-before', stage: stage };
+
+    MailApp.sendEmail({
+      to: getAlertEmail(),
+      subject: 'Alternator Gresleme Uyarisi - ' + motor,
+      body: [
+        'Alternator Gresleme Uyarisi',
+        '',
+        'Motor: ' + motor,
+        'Guncel calisma saati: ' + plan.currentHours,
+        'Son gresleme saati: ' + (plan.lastGreaseHours || 'Kayit yok'),
+        'Gresleme araligi: ' + plan.intervalHours + ' saat',
+        'Sonraki gresleme esigi: ' + plan.nextHours,
+        'Kalan saat: ' + plan.remainingHours,
+        'Uyari kademesi: ' + stage,
+        'Hesap kaynagi: ' + plan.basis
+      ].join('\n')
+    });
+
+    props.setProperty(key, new Date().toISOString());
+    return { sent: true, stage: stage };
+  } catch (error) {
+    Logger.log('Alternator gresleme maili gonderilemedi: ' + error.toString());
+    return { sent: false, error: error.toString() };
+  }
+}
+
+function updateSettingsMotorHours(ss) {
+  ss = ss || getSpreadsheet();
+  const motors = MOTORS.map(function(motor) {
+    const info = getLatestEnergyMotorHoursInfo(ss, motor);
+    return {
+      motor: motor,
+      currentHours: info.hours,
+      currentHoursSource: info.source,
+      lastUpdated: formatDateTime(new Date()),
+      note: info.note || ''
+    };
+  });
+
+  writeSettingsMotorHours(ss, motors);
+  writeSettingsAlternatorGreaseTable(ss, motors);
+  writeSettingsOilSampleTable(ss, motors);
+  return jsonResponse(true, 'Ayarlar motor saatleri guncellendi', { motors: motors });
+}
+
+function writeSettingsMotorHours(ss, motors) {
+  ss = ss || getSpreadsheet();
+  const sheet = ensureSettingsSheet(ss);
+  const startColumn = 4;
+  const headers = ['Motor', 'Guncel Calisma Saati', 'Kaynak', 'Son Guncelleme', 'Not'];
+  const rows = (motors || []).map(function(item) {
+    return [
+      item.motor || '',
+      item.currentHours || 0,
+      item.currentHoursSource || '',
+      item.lastUpdated || formatDateTime(new Date()),
+      item.note || ''
+    ];
+  });
+
+  sheet.getRange(1, startColumn, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#0f766e')
+    .setFontColor('#ffffff');
+
+  sheet.getRange(2, startColumn, MOTORS.length, headers.length).clearContent();
+
+  if (rows.length) {
+    sheet.getRange(2, startColumn, rows.length, headers.length).setValues(rows);
+  }
+}
+
+function writeSettingsAlternatorGreaseTable(ss, motors) {
+  ss = ss || getSpreadsheet();
+  const sheet = ensureSettingsSheet(ss);
+  const startRow = 10;
+  const startColumn = 4;
+  const headers = [
+    'Motor',
+    'Son Alternator Gresleme Saati',
+    'Guncel Motor Saati',
+    'Sonraki Gresleme Saati',
+    'Greslemeye Kalan Saat',
+    'Durum'
+  ];
+
+  const motorHoursMap = buildMotorHoursMap(motors);
+  const rows = MOTORS.map(function(motor) {
+    const currentHours = getCachedMotorHours(motorHoursMap, motor);
+    const lastGreaseHours = getLastAlternatorGreaseHours(ss, motor);
+    const nextGreaseHours = lastGreaseHours > 0 ? lastGreaseHours + ALTERNATOR_GREASE_INTERVAL_HOURS : '';
+    const remainingHours = nextGreaseHours ? Math.max(0, nextGreaseHours - currentHours) : '';
+    let status = 'Kayit yok';
+
+    if (nextGreaseHours) {
+      if (remainingHours === 0) status = 'Gresleme zamani geldi';
+      else if (remainingHours <= ALTERNATOR_GREASE_WARNING_HOURS) status = ALTERNATOR_GREASE_WARNING_HOURS + ' saat kala uyar';
+      else status = 'Normal';
+    }
+
+    return [
+      motor,
+      lastGreaseHours || '',
+      currentHours || 0,
+      nextGreaseHours,
+      remainingHours,
+      status
+    ];
+  });
+
+  sheet.getRange(startRow, startColumn, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#92400e')
+    .setFontColor('#ffffff');
+
+  sheet.getRange(startRow + 1, startColumn, MOTORS.length, headers.length).clearContent();
+  sheet.getRange(startRow + 1, startColumn, rows.length, headers.length).setValues(rows);
+}
+
+function writeSettingsOilSampleTable(ss, motors) {
+  ss = ss || getSpreadsheet();
+  const sheet = ensureSettingsSheet(ss);
+  const startRow = 20;
+  const startColumn = 4;
+  const headers = [
+    'Motor',
+    'Son Yag Numune Saati',
+    'Guncel Motor Saati',
+    'Sonraki Numune Saati',
+    'Numuneye Kalan Saat',
+    'Durum'
+  ];
+
+  const motorHoursMap = buildMotorHoursMap(motors);
+  const rows = MOTORS.map(function(motor) {
+    const currentHours = getCachedMotorHours(motorHoursMap, motor);
+    const lastSampleHours = getLastOilSampleHours(ss, motor);
+    const plan = calculateOilSamplePlan(currentHours, lastSampleHours);
+    let status = 'Kayit yok';
+
+    if (plan.nextHours) {
+      if (plan.remainingHours === 0) status = 'Numune zamani geldi';
+      else if (plan.remainingHours <= OIL_SAMPLE_URGENT_WARNING_HOURS) status = OIL_SAMPLE_URGENT_WARNING_HOURS + ' saat kala uyar';
+      else if (plan.remainingHours <= OIL_SAMPLE_WARNING_HOURS) status = OIL_SAMPLE_WARNING_HOURS + ' saat kala uyar';
+      else status = 'Normal';
+    }
+
+    return [
+      motor,
+      lastSampleHours || '',
+      currentHours || 0,
+      plan.nextHours || '',
+      plan.remainingHours,
+      status
+    ];
+  });
+
+  sheet.getRange(startRow, startColumn, 1, headers.length)
+    .setValues([headers])
+    .setFontWeight('bold')
+    .setBackground('#1d4ed8')
+    .setFontColor('#ffffff');
+
+  sheet.getRange(startRow + 1, startColumn, MOTORS.length, headers.length).clearContent();
+  sheet.getRange(startRow + 1, startColumn, rows.length, headers.length).setValues(rows);
+}
+
+function buildMotorHoursMap(motors) {
+  const map = {};
+  (motors || []).forEach(function(item) {
+    if (!item || !item.motor) return;
+    map[normalizeMotor(item.motor)] = parseNumber(item.currentHours);
+  });
+  return map;
+}
+
+function getCachedMotorHours(map, motor) {
+  const normalized = normalizeMotor(motor);
+  return map && Object.prototype.hasOwnProperty.call(map, normalized) ? map[normalized] : 0;
+}
+
+function getLatestEnergyMotorHoursInfo(ss, motor) {
+  ss = ss || getSpreadsheet();
+  const local = getLatestEnergyMotorHoursFromSheets(ss, motor);
+  if (local > 0) {
+    return { hours: local, source: 'Enerji sheet N sutunu', note: '' };
+  }
+
+  const api = getLatestEnergyMotorHoursFromApi(motor);
+  if (api > 0) {
+    return { hours: api, source: 'Kojen Enerji API', note: '' };
+  }
+
+  return { hours: 0, source: 'Bulunamadi', note: 'Enerji sheet ve API kaydi yok' };
+}
+
+function getLastRecordMotorHours(ss, sheetName) {
+  ss = ss || getSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  const headers = getSheetHeaders(sheet);
+  const hoursColumn = getHeaderIndex(headers, [
+    'Guncel Motor Saati',
+    'Motor Saati',
+    'Calisma Saati',
+    'Çalışma Saati',
+    'Filtre Motor Saati',
+    'Alternator Motor Saati'
+  ]) + 1;
+  if (!hoursColumn) return 0;
+
+  const values = sheet.getRange(2, hoursColumn, sheet.getLastRow() - 1, 1).getDisplayValues();
+  for (let i = values.length - 1; i >= 0; i--) {
+    const hours = parseNumber(values[i][0]);
+    if (hours > 0) return hours;
+  }
+  return 0;
+}
+
+function getLastOilSampleHours(ss, motor) {
+  ss = ss || getSpreadsheet();
+  const direct = getLastRecordMotorHours(ss, 'Yag Numune ' + normalizeMotor(motor));
+  if (direct > 0) return direct;
+  return getLastMaintenanceHoursByTerms(ss, motor, ['NUMUNE']);
+}
+
+function getLastAlternatorGreaseHours(ss, motor) {
+  ss = ss || getSpreadsheet();
+  const direct = getLastRecordMotorHours(ss, 'Alternator Gresleme ' + normalizeMotor(motor));
+  if (direct > 0) return direct;
+  return getLastMaintenanceHoursByTerms(ss, motor, ['GRES', 'ALTERNATOR']);
+}
+
+function getLastMaintenanceHoursByTerms(ss, motor, terms) {
+  ss = ss || getSpreadsheet();
+  const normalizedMotor = normalizeMotor(motor);
+  const sheets = ss.getSheets();
+  let latestHours = 0;
+
+  for (let s = 0; s < sheets.length; s++) {
+    const sheet = sheets[s];
+    if (!sheet || sheet.getLastRow() < 2) continue;
+
+    const headers = getSheetHeaders(sheet);
+    const motorColumn = getHeaderIndex(headers, ['Motor']);
+    const hoursColumns = getHeaderIndexes(headers, [
+      'Guncel Motor Saati',
+      'Motor Saati',
+      'Calisma Saati',
+      'Çalışma Saati',
+      'Filtre Motor Saati',
+      'Alternator Motor Saati'
+    ]);
+    if (motorColumn === -1 || !hoursColumns.length) continue;
+
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
+    for (let r = rows.length - 1; r >= 0; r--) {
+      const row = rows[r];
+      if (normalizeMotor(row[motorColumn]) !== normalizedMotor) continue;
+
+      if (!rowMatchesMaintenanceTerms(sheet, headers, row, terms)) continue;
+
+      const hours = getBestRowHours(row, hoursColumns);
+      if (hours > latestHours) latestHours = hours;
+    }
+  }
+
+  return latestHours;
+}
+
+function rowMatchesMaintenanceTerms(sheet, headers, row, terms) {
+  const haystack = normalizeSearchText(sheet.getName() + ' ' + headers.join(' ') + ' ' + row.join(' '));
+  return (terms || []).some(function(term) {
+    return haystack.indexOf(normalizeSearchText(term)) !== -1;
+  });
+}
+
+function getBestRowHours(row, indexes) {
+  let best = 0;
+  (indexes || []).forEach(function(index) {
+    const hours = parseNumber(row[index]);
+    if (hours > best) best = hours;
+  });
+  return best;
+}
+
+function getHeaderIndex(headers, names) {
+  const normalizedNames = (names || []).map(function(name) {
+    return normalizeSearchText(name);
+  });
+
+  for (let i = 0; i < headers.length; i++) {
+    if (normalizedNames.indexOf(normalizeSearchText(headers[i])) !== -1) return i;
+  }
+
+  for (let i = 0; i < headers.length; i++) {
+    const headerText = normalizeSearchText(headers[i]);
+    for (let n = 0; n < normalizedNames.length; n++) {
+      if (headerText.indexOf(normalizedNames[n]) !== -1) return i;
+    }
+  }
+
+  return -1;
+}
+
+function getHeaderIndexes(headers, names) {
+  const indexes = [];
+  (names || []).forEach(function(name) {
+    const index = getHeaderIndex(headers, [name]);
+    if (index !== -1 && indexes.indexOf(index) === -1) indexes.push(index);
+  });
+  return indexes;
+}
+
+function scheduledMaintenanceCheck() {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+    const ss = getSpreadsheet();
+    ensureWorkbook(ss);
+    updateSettingsMotorHours(ss);
+    getPeriodicMaintenanceStatus(ss);
+    checkOilSampleAlerts(ss);
+    checkAlternatorGreaseAlerts(ss);
+    updateStatsSheet(ss);
+
+    PropertiesService.getScriptProperties().setProperties({
+      [MAINTENANCE_LAST_RUN_PROPERTY]: formatDateTime(new Date()),
+      [MAINTENANCE_LAST_ERROR_PROPERTY]: ''
+    });
+  } catch (error) {
+    PropertiesService.getScriptProperties().setProperties({
+      [MAINTENANCE_LAST_RUN_PROPERTY]: formatDateTime(new Date()),
+      [MAINTENANCE_LAST_ERROR_PROPERTY]: error.toString()
+    });
+    Logger.log('Bakim tetikleyici hatasi: ' + error.toString());
+    Logger.log(error.stack || '');
+    throw error;
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (lockError) {}
+  }
+}
+
+function runMaintenanceCheck() {
+  scheduledMaintenanceCheck();
+  return jsonResponse(true, 'Bakim kontrolleri calistirildi');
+}
+
+function installMaintenanceTriggers() {
+  removeProjectTriggersByHandler(['scheduledMaintenanceCheck']);
+
+  const hourlyTrigger = ScriptApp.newTrigger('scheduledMaintenanceCheck')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  const dailyTrigger = ScriptApp.newTrigger('scheduledMaintenanceCheck')
+    .timeBased()
+    .everyDays(1)
+    .atHour(7)
+    .create();
+
+  scheduledMaintenanceCheck();
+
+  return jsonResponse(true, 'Bakim tetikleyicileri kuruldu', {
+    installed: true,
+    triggerCount: 2,
+    lastRun: PropertiesService.getScriptProperties().getProperty(MAINTENANCE_LAST_RUN_PROPERTY) || '',
+    lastError: PropertiesService.getScriptProperties().getProperty(MAINTENANCE_LAST_ERROR_PROPERTY) || '',
+    triggers: [{
+      handler: hourlyTrigger.getHandlerFunction(),
+      type: 'timeBased',
+      interval: '1 saat'
+    }, {
+      handler: dailyTrigger.getHandlerFunction(),
+      type: 'timeBased',
+      interval: 'her gun 07:00'
+    }]
+  });
+}
+
+function removeMaintenanceTriggers() {
+  const removed = removeProjectTriggersByHandler(['scheduledMaintenanceCheck']);
+  return jsonResponse(true, 'Bakim tetikleyicileri kaldirildi', { removed: removed });
+}
+
+function getMaintenanceTriggers() {
+  const props = PropertiesService.getScriptProperties();
+  const triggers = ScriptApp.getProjectTriggers()
+    .filter(function(trigger) {
+      return trigger.getHandlerFunction() === 'scheduledMaintenanceCheck';
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource()),
+        id: trigger.getUniqueId ? trigger.getUniqueId() : ''
+      };
+    });
+
+  return jsonResponse(true, 'Bakim tetikleyicileri getirildi', {
+    installed: triggers.length > 0,
+    triggerCount: triggers.length,
+    lastRun: props.getProperty(MAINTENANCE_LAST_RUN_PROPERTY) || '',
+    lastError: props.getProperty(MAINTENANCE_LAST_ERROR_PROPERTY) || '',
+    lastLog: {
+      kayitZamani: props.getProperty(MAINTENANCE_LAST_RUN_PROPERTY) || '',
+      hataMesaji: props.getProperty(MAINTENANCE_LAST_ERROR_PROPERTY) || ''
+    },
+    triggers: triggers
+  });
+}
+
+function removeProjectTriggersByHandler(handlerNames) {
+  const names = handlerNames || [];
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (names.indexOf(trigger.getHandlerFunction()) === -1) return;
+    ScriptApp.deleteTrigger(trigger);
+    removed++;
+  });
+  return removed;
+}
+
+function getMaintenanceStats(ss, params) {
+  const records = readAllRecords(ss);
+  const now = new Date();
+  const monthKey = formatMonthKey(now);
+  const technicians = {};
+  let monthly = 0;
+  let faults = 0;
+
+  records.forEach(function(record) {
+    if (formatMonthKey(parseDateTR(record.date)) === monthKey) monthly++;
+    if (record.type === 'Ariza') faults++;
+    if (record.technician) technicians[record.technician] = true;
+  });
+
+  const chartData = buildChartData(records, parseInt(getParam(params, 'period'), 10) || 6);
+  return jsonResponse(true, 'Istatistikler getirildi', {
+    stats: {
+      total: records.length,
+      monthly: monthly,
+      faults: faults,
+      technicians: Object.keys(technicians).length
+    },
+    chartData: chartData
+  });
+}
+
+function getMaintenanceReport(ss, params) {
+  const motorFilter = getParam(params, 'motor');
+  const typeFilter = normalizeMainType(getParam(params, 'type'));
+  const rawType = getParam(params, 'type');
+  const range = parseInt(getParam(params, 'range'), 10) || 30;
+  const start = new Date();
+  start.setDate(start.getDate() - range);
+
+  let records = readAllRecords(ss).filter(function(record) {
+    const date = parseDateTR(record.date);
+    if (date && date < start) return false;
+    if (motorFilter && record.motor !== motorFilter) return false;
+    if (rawType && record.type !== typeFilter) return false;
+    return true;
+  });
+
+  const summary = { total: records.length, periodic: 0, normal: 0, fault: 0 };
+  records.forEach(function(record) {
+    if (record.type === 'Periyodik') summary.periodic++;
+    else if (record.type === 'Ariza') summary.fault++;
+    else summary.normal++;
+  });
+
+  return jsonResponse(true, 'Rapor olusturuldu', { summary: summary, records: records });
+}
+
+function getActiveRecords(ss, params) {
+  const motorFilter = getParam(params, 'motor');
+  const rawType = getParam(params, 'type');
+  const typeFilter = rawType ? normalizeMainType(rawType) : '';
+
+  const records = readAllRecords(ss).filter(function(record) {
+    if (record.status !== 'Aktif') return false;
+    if (motorFilter && record.motor !== motorFilter) return false;
+    if (typeFilter && record.type !== typeFilter) return false;
+    return true;
+  });
+
+  return jsonResponse(true, 'Aktif kayitlar getirildi', { records: records });
+}
+
+function closeRecord(ss, params) {
+  const recordNo = getParam(params, 'recordNo');
+  if (!recordNo) return jsonResponse(false, 'Kayit numarasi eksik');
+
+  const sheets = getSheetDefinitions();
+  for (let i = 0; i < sheets.length; i++) {
+    const sheet = ss.getSheetByName(sheets[i].name);
+    if (!sheet || sheet.getLastRow() < 2) continue;
+
+    const headers = getSheetHeaders(sheet);
+    const recordNoColumn = headers.indexOf('Kayit No') + 1;
+    const statusColumn = headers.indexOf('Durum') + 1;
+    const closedAtColumn = headers.indexOf('Kapama Zamani') + 1;
+    if (!recordNoColumn || !statusColumn || !closedAtColumn) continue;
+
+    const values = sheet.getRange(2, recordNoColumn, sheet.getLastRow() - 1, 1).getValues();
+    for (let r = 0; r < values.length; r++) {
+      if (String(values[r][0]) === recordNo) {
+        const row = r + 2;
+        sheet.getRange(row, statusColumn).setValue('Kapali');
+        sheet.getRange(row, closedAtColumn).setValue(formatDateTime(new Date()));
+        updateStatsSheet(ss);
+        return jsonResponse(true, 'Kayit kapatildi', { recordNo: recordNo });
+      }
+    }
+  }
+
+  return jsonResponse(false, 'Kayit bulunamadi: ' + recordNo);
+}
+
+function readAllRecords(ss) {
+  const records = [];
+  getSheetDefinitions().forEach(function(definition) {
+    const sheet = ss.getSheetByName(definition.name);
+    if (!sheet || sheet.getLastRow() < 2) return;
+
+    const headers = getSheetHeaders(sheet);
+    const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).getDisplayValues();
+    rows.forEach(function(row) {
+      const value = function(header) {
+        const index = headers.indexOf(header);
+        return index === -1 ? '' : row[index];
+      };
+      if (!value('Kayit No')) return;
+      records.push({
+        recordNo: value('Kayit No'),
+        date: value('Tarih'),
+        time: value('Saat'),
+        motor: value('Motor'),
+        type: value('Bakim Ana Turu'),
+        subtype: value('Bakim Alt Turu'),
+        company: value('Destek Tipi'),
+        technician: value('Sorumlu'),
+        status: value('Durum'),
+        notes: value('Aciklama'),
+        files: value('Dosyalar'),
+        timestamp: value('Kayit Zamani'),
+        closedAt: value('Kapama Zamani'),
+        currentHours: value('Guncel Motor Saati'),
+        startDate: value('Baslangic Tarihi'),
+        startTime: value('Baslangic Saati'),
+        endDate: value('Bitis Tarihi'),
+        endTime: value('Bitis Saati'),
+        operation: value('Bakim Alt Turu') || value('Aciklama'),
+        sheetName: definition.name
+      });
+    });
+  });
+
+  records.sort(function(a, b) {
+    return parseDateTimeTR(b.date, b.time) - parseDateTimeTR(a.date, a.time);
+  });
+  return records;
+}
+
+function getSheetHeaders(sheet) {
+  if (!sheet || sheet.getLastColumn() < 1) return [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].filter(function(header) {
+    return String(header || '').trim() !== '';
+  });
+}
+
+function buildChartData(records, period) {
+  const labels = [];
+  const periodic = [];
+  const normal = [];
+  const fault = [];
+  const now = new Date();
+
+  for (let i = period - 1; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = formatMonthKey(date);
+    labels.push((date.getMonth() + 1) + '/' + date.getFullYear());
+    periodic.push(0);
+    normal.push(0);
+    fault.push(0);
+
+    records.forEach(function(record) {
+      if (formatMonthKey(parseDateTR(record.date)) !== key) return;
+      if (record.type === 'Periyodik') periodic[periodic.length - 1]++;
+      else if (record.type === 'Ariza') fault[fault.length - 1]++;
+      else normal[normal.length - 1]++;
+    });
+  }
+
+  return {
+    labels: labels,
+    periodic: periodic,
+    normal: normal,
+    fault: fault,
+    data: periodic.map(function(value, index) {
+      return value + normal[index] + fault[index];
+    })
+  };
+}
+
+function updateStatsSheet(ss) {
+  const stats = buildChartData(readAllRecords(ss), 12);
+  const sheet = ensureStatsSheet(ss);
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 8).clearContent();
+  }
+  const rows = stats.labels.map(function(label, index) {
+    return [
+      label,
+      stats.data[index],
+      stats.periodic[index],
+      stats.normal[index],
+      stats.fault[index],
+      '',
+      '',
+      ''
+    ];
+  });
+  if (rows.length) sheet.getRange(2, 1, rows.length, 8).setValues(rows);
+}
+
+function uploadFilesIfPresent(params, mainType, motor, subtype, expectedFileCount) {
+  const filesParam = getParam(params, 'files');
+  if (!filesParam || filesParam === '[]' || filesParam === 'undefined') {
+    return expectedFileCount > 0 ? 'Dosya secildi ancak files parametresi bos geldi' : '';
+  }
+
+  try {
+    const files = JSON.parse(filesParam);
+    if (!Array.isArray(files) || !files.length) return '';
+
+    const folderResult = getUploadFolder(mainType);
+    if (!folderResult.success) return folderResult.error;
+
+    const folder = folderResult.folder;
+    const links = [];
+    const errors = [];
+
+    files.forEach(function(file) {
+      try {
+        if (!file.base64) {
+          errors.push((file.name || 'dosya') + ': base64 veri yok');
+          return;
+        }
+
+        const base64 = String(file.base64).indexOf(',') !== -1 ? String(file.base64).split(',')[1] : file.base64;
+        const bytes = Utilities.base64Decode(base64);
+        const name = [motor, subtype, formatDateTime(new Date()).replace(/[:. ]/g, '-'), file.name || 'dosya'].join('_');
+        const blob = Utilities.newBlob(bytes, file.type || 'application/octet-stream', name);
+        const driveFile = folder.createFile(blob);
+        const sharingNote = setFileSharingSafely(driveFile);
+        links.push(driveFile.getName() + ': ' + driveFile.getUrl() + sharingNote);
+      } catch (fileError) {
+        errors.push((file.name || 'dosya') + ': ' + fileError.toString());
+      }
+    });
+
+    if (links.length && errors.length) return links.concat(['Hatalar: ' + errors.join(' | ')]).join('\n');
+    if (links.length) return links.join('\n');
+    if (errors.length) return 'Dosya yuklenemedi: ' + errors.join(' | ');
+    return 'Dosya secildi ancak yuklenecek veri bulunamadi';
+  } catch (error) {
+    Logger.log('Dosya yukleme hatasi: ' + error.toString());
+    return 'Dosya yukleme hatasi: ' + error.toString();
+  }
+}
+
+function getUploadFolder(mainType) {
+  const folderId = mainType === 'Periyodik'
+    ? DRIVE_FOLDERS.PERIODIC
+    : mainType === 'Ariza'
+      ? DRIVE_FOLDERS.FAULT
+      : DRIVE_FOLDERS.NORMAL;
+
+  try {
+    return { success: true, folder: DriveApp.getFolderById(folderId), source: 'configured' };
+  } catch (configuredError) {
+    try {
+      const folderName = 'Bakim Takip Dosyalari';
+      const folders = DriveApp.getFoldersByName(folderName);
+      const folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+      return { success: true, folder: folder, source: 'fallback', configuredError: configuredError.toString() };
+    } catch (fallbackError) {
+      return {
+        success: false,
+        error: 'Drive erisimi yok. Apps Script editorunde testDriveAccess fonksiyonunu calistirip Drive iznini onaylayin. Hata: ' + fallbackError.toString()
+      };
+    }
+  }
+}
+
+function setFileSharingSafely(driveFile) {
+  if (!ENABLE_PUBLIC_FILE_SHARING) return '';
+
+  try {
+    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return '';
+  } catch (sharingError) {
+    return ' (paylasim ayari yapilamadi: ' + sharingError.toString() + ')';
+  }
+}
+
+function testDriveAccess() {
+  const checks = {};
+  Object.keys(DRIVE_FOLDERS).forEach(function(key) {
+    try {
+      const folder = DriveApp.getFolderById(DRIVE_FOLDERS[key]);
+      checks[key] = {
+        success: true,
+        folderId: DRIVE_FOLDERS[key],
+        folderName: folder.getName()
+      };
+    } catch (error) {
+      checks[key] = {
+        success: false,
+        folderId: DRIVE_FOLDERS[key],
+        error: error.toString()
+      };
+    }
+  });
+
+  try {
+    const fallback = getUploadFolder('Normal');
+    checks.fallback = {
+      success: fallback.success,
+      folderName: fallback.folder ? fallback.folder.getName() : '',
+      error: fallback.error || fallback.configuredError || ''
+    };
+  } catch (error) {
+    checks.fallback = { success: false, error: error.toString() };
+  }
+
+  return jsonResponse(true, 'Drive erisim testi tamamlandi', { checks: checks });
+}
+
+function parseNumber(value) {
+  if (value === null || typeof value === 'undefined' || value === '') return 0;
+  if (typeof value === 'number') return value;
+
+  let text = String(value).trim();
+  if (text.indexOf(',') !== -1) text = text.replace(/\./g, '').replace(',', '.');
+  const parsed = parseFloat(text);
   return isNaN(parsed) ? 0 : parsed;
 }
 
-// Motor saatlerini getir
-function getMotorHours(ss) {
-  try {
-    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-    if (!sheet) {
-      return createResponse(false, 'Motor Saatleri sayfası bulunamadı');
-    }
-    
-    const data = sheet.getRange(2, 1, 3, 10).getValues();
-    const motors = [];
-    
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const currentHours = parseInt(row[1]) || 0;
-      
-      // Yağ numune hesaplamaları
-      const lastOilSample = parseInt(row[2]) || 0;
-      const nextOilSample = parseInt(row[5]) || 500;
-      const remainingOilHours = nextOilSample - (currentHours - lastOilSample);
-      const needsOilSample = remainingOilHours <= 50; // 50 saat kala uyarı
-      
-      // Alternatör gresleme hesaplamaları
-      const lastAlternatorGrease = parseInt(row[6]) || 0;
-      const nextAlternatorGrease = parseInt(row[8]) || 1000;
-      const remainingAltHours = nextAlternatorGrease - (currentHours - lastAlternatorGrease);
-      const needsAlternatorGrease = remainingAltHours <= 100; // 100 saat kala uyarı
-      
-      motors.push({
-        motor: row[0],
-        currentHours: currentHours,
-        // Yağ numune
-        lastOilSampleHours: lastOilSample,
-        lastOilSampleDate: row[3],
-        nextOilSampleHours: nextOilSample,
-        remainingOilHours: remainingOilHours,
-        needsOilSample: needsOilSample,
-        notes: row[5],
-        // Alternatör gresleme
-        lastAlternatorGreaseHours: lastAlternatorGrease,
-        lastAlternatorGreaseDate: row[7],
-        nextAlternatorGreaseHours: nextAlternatorGrease,
-        remainingAltHours: remainingAltHours,
-        needsAlternatorGrease: needsAlternatorGrease,
-        alternatorNotes: row[9]
-      });
-    }
-    
-    return createResponse(true, 'Motor saatleri getirildi', { motors: motors });
-    
-  } catch (error) {
-    Logger.log('Motor saatleri getirilirken hata: ' + error.toString());
-    return createResponse(false, 'Motor saatleri getirilemedi: ' + error.toString());
+function parseDateTR(value) {
+  const text = String(value || '').trim();
+  if (!text) return null;
+  if (text.indexOf('-') !== -1) {
+    const p = text.split('-');
+    return new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
   }
+  const parts = text.split('.');
+  if (parts.length !== 3) return null;
+  return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
 }
 
-// Motor saatlerini güncelle
-function updateMotorHours(ss, params) {
-  try {
-    const motor = (Array.isArray(params.motor) ? params.motor[0] : params.motor) || '';
-    const hours = parseInt(Array.isArray(params.hours) ? params.hours[0] : params.hours) || 0;
-    
-    if (!motor || hours < 0) {
-      return createResponse(false, 'Geçersiz motor veya saat değeri');
-    }
-    
-    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-    if (!sheet) {
-      return createResponse(false, 'Motor Saatleri sayfası bulunamadı');
-    }
-    
-    // Motor satırını bul
-    const data = sheet.getRange(2, 1, 3, 1).getValues();
-    let foundRow = -1;
-    
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === motor) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-    
-    if (foundRow === -1) {
-      return createResponse(false, 'Motor bulunamadı: ' + motor);
-    }
-    
-    // Çalışma saatini güncelle
-    sheet.getRange(foundRow, 2).setValue(hours);
-    
-    Logger.log('Motor saati güncellendi: ' + motor + ' = ' + hours + ' saat');
-    
-    return createResponse(true, 'Motor saati güncellendi', { 
-      motor: motor,
-      hours: hours
-    });
-    
-  } catch (error) {
-    Logger.log('Motor saati güncellenirken hata: ' + error.toString());
-    return createResponse(false, 'Motor saati güncellenemedi: ' + error.toString());
-  }
+function parseDateTimeTR(dateValue, timeValue) {
+  const date = parseDateTR(dateValue) || new Date(0);
+  const timeParts = String(timeValue || '00:00').split(':');
+  date.setHours(parseInt(timeParts[0] || '0', 10), parseInt(timeParts[1] || '0', 10), 0, 0);
+  return date;
 }
 
-// Yağ numune alma kaydı
-function updateOilSample(ss, params) {
-  try {
-    const motor = (Array.isArray(params.motor) ? params.motor[0] : params.motor) || '';
-    const currentHours = parseInt(Array.isArray(params.currentHours) ? params.currentHours[0] : params.currentHours) || 0;
-    
-    if (!motor) {
-      return createResponse(false, 'Motor belirtilmedi');
-    }
-    
-    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-    if (!sheet) {
-      return createResponse(false, 'Motor Saatleri sayfası bulunamadı');
-    }
-    
-    // Motor satırını bul
-    const data = sheet.getRange(2, 1, 3, 1).getValues();
-    let foundRow = -1;
-    
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === motor) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-    
-    if (foundRow === -1) {
-      return createResponse(false, 'Motor bulunamadı: ' + motor);
-    }
-    
-    const today = new Date().toLocaleDateString('tr-TR');
-    const nextSample = currentHours + 500; // Bir sonraki yağ numune +500 saat
-    
-    // Yağ numune bilgilerini güncelle
-    sheet.getRange(foundRow, 2).setValue(currentHours); // Mevcut saat
-    sheet.getRange(foundRow, 3).setValue(currentHours); // Son yağ numune saati
-    sheet.getRange(foundRow, 4).setValue(today); // Son yağ numune tarihi
-    sheet.getRange(foundRow, 5).setValue(nextSample); // Bir sonraki yağ numune
-    
-    Logger.log('Yağ numune kaydı güncellendi: ' + motor + ' - ' + currentHours + ' saat');
-    
-    return createResponse(true, 'Yağ numune kaydı güncellendi', { 
-      motor: motor,
-      currentHours: currentHours,
-      nextOilSample: nextSample,
-      date: today
-    });
-    
-  } catch (error) {
-    Logger.log('Yağ numune kaydı güncellenirken hata: ' + error.toString());
-    return createResponse(false, 'Yağ numune kaydı güncellenemedi: ' + error.toString());
-  }
+function formatMonthKey(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0');
 }
 
-// Alternatör gresleme kaydı
-function updateAlternatorGrease(ss, params) {
-  try {
-    const motor = (Array.isArray(params.motor) ? params.motor[0] : params.motor) || '';
-    const currentHours = parseInt(Array.isArray(params.currentHours) ? params.currentHours[0] : params.currentHours) || 0;
-    
-    if (!motor) {
-      return createResponse(false, 'Motor belirtilmedi');
-    }
-    
-    const sheet = ss.getSheetByName(SHEET_NAMES.MOTOR_HOURS);
-    if (!sheet) {
-      return createResponse(false, 'Motor Saatleri sayfası bulunamadı');
-    }
-    
-    // Motor satırını bul
-    const data = sheet.getRange(2, 1, 3, 1).getValues();
-    let foundRow = -1;
-    
-    for (let i = 0; i < data.length; i++) {
-      if (data[i][0] === motor) {
-        foundRow = i + 2;
-        break;
-      }
-    }
-    
-    if (foundRow === -1) {
-      return createResponse(false, 'Motor bulunamadı: ' + motor);
-    }
-    
-    const today = new Date().toLocaleDateString('tr-TR');
-    const nextGrease = currentHours + 1000; // Bir sonraki alternatör gresleme +1000 saat
-    
-    // Alternatör gresleme bilgilerini güncelle (sütun 7, 8, 9)
-    sheet.getRange(foundRow, 7).setValue(currentHours); // Son alternatör gresleme saati
-    sheet.getRange(foundRow, 8).setValue(today); // Son alternatör gresleme tarihi
-    sheet.getRange(foundRow, 9).setValue(nextGrease); // Bir sonraki alternatör gresleme
-    
-    Logger.log('Alternatör gresleme kaydı güncellendi: ' + motor + ' - ' + currentHours + ' saat');
-    
-    return createResponse(true, 'Alternatör gresleme kaydı güncellendi', { 
-      motor: motor,
-      currentHours: currentHours,
-      nextAlternatorGrease: nextGrease,
-      date: today
-    });
-    
-  } catch (error) {
-    Logger.log('Alternatör gresleme kaydı güncellenirken hata: ' + error.toString());
-    return createResponse(false, 'Alternatör gresleme kaydı güncellenemedi: ' + error.toString());
-  }
+function formatDate(date) {
+  return String(date.getDate()).padStart(2, '0') + '.' +
+    String(date.getMonth() + 1).padStart(2, '0') + '.' +
+    date.getFullYear();
 }
 
-// Sistemi başlat
-function initializeSystem(ss) {
-  try {
-    // Eğer ss parametresi yoksa, spreadsheet'i al
-    if (!ss) {
-      Logger.log('initializeSystem: ss parametresi yok, getOrCreateSpreadsheet() çağrılıyor...');
-      ss = getOrCreateSpreadsheet();
-    }
-    
-    createSheets(ss);
-    
-    const spreadsheetId = ss.getId();
-    const spreadsheetUrl = ss.getUrl();
-    
-    return createResponse(true, "Sistem başarıyla başlatıldı", {
-      spreadsheetId: spreadsheetId,
-      spreadsheetUrl: spreadsheetUrl,
-      message: "Google Sheets başarıyla oluşturuldu ve hazırlandı."
-    });
-    
-  } catch (error) {
-    throw new Error('Sistem başlatılamadı: ' + error.toString());
-  }
+function formatTime(date) {
+  return String(date.getHours()).padStart(2, '0') + ':' +
+    String(date.getMinutes()).padStart(2, '0');
 }
 
-// Bağlantı testi
-function testConnection(ss) {
-  try {
-    if (!ss) {
-      // Eğer ss gönderilmemişse, spreadsheet'i al
-      ss = getOrCreateSpreadsheet();
-    }
-    
-    const spreadsheetId = ss.getId();
-    const spreadsheetUrl = ss.getUrl();
-    const sheetNames = [];
-    
-    // Tüm sayfaları kontrol et
-    const sheets = ss.getSheets();
-    sheets.forEach(sheet => {
-      sheetNames.push(sheet.getName());
-    });
-    
-    return createResponse(true, "Bağlantı başarılı", {
-      spreadsheetId: spreadsheetId,
-      spreadsheetUrl: spreadsheetUrl,
-      sheetNames: sheetNames,
-      totalSheets: sheets.length,
-      timestamp: new Date().toLocaleDateString('tr-TR')
-    });
-    
-  } catch (error) {
-    throw new Error('Bağlantı testi başarısız: ' + error.toString());
-  }
+function formatDateTime(date) {
+  return formatDate(date) + ' ' + formatTime(date) + ':' + String(date.getSeconds()).padStart(2, '0');
 }
 
-// Yanıt oluştur
-function createResponse(success, message, data = null) {
+function jsonResponse(success, message, data) {
   const response = {
     success: success,
     message: message,
-    timestamp: new Date().toLocaleDateString('tr-TR')
+    timestamp: formatDateTime(new Date())
   };
-  
-  if (data) {
-    // Veriyi direkt response objesine spread et (data.data içine değil)
-    Object.assign(response, data);
-  }
-  
+  if (data) Object.assign(response, data);
+
   return ContentService.createTextOutput(JSON.stringify(response))
     .setMimeType(ContentService.MimeType.JSON);
-}
-
-// Test fonksiyonları
-function testSystem() {
-  try {
-    Logger.log('=== SİSTEM TEST BAŞLATILIYOR ===');
-    
-    const ss = getOrCreateSpreadsheet();
-    Logger.log('Spreadsheet ID: ' + ss.getId());
-    Logger.log('URL: ' + ss.getUrl());
-    
-    // Sayfaları kontrol et
-    const sheets = ss.getSheets();
-    Logger.log('Toplam sayfa sayısı: ' + sheets.length);
-    
-    sheets.forEach(sheet => {
-      Logger.log('Sayfa: ' + sheet.getName() + ' (Son satır: ' + sheet.getLastRow() + ')');
-    });
-    
-    // Test kaydı ekle
-    Logger.log('Test kaydı ekleniyor...');
-    const testParams = {
-      action: 'save',
-      date: new Date().toLocaleDateString('tr-TR'),
-      time: new Date().toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'}),
-      motor: 'GM-1',
-      type: 'Periyodik',
-      subtype: '2000 Saat',
-      technician: 'Test Teknisyen',
-      company: 'İç Destek',
-      notes: 'Test kaydı'
-    };
-    
-    const result = saveMaintenanceRecord(ss, testParams);
-    Logger.log('Test sonucu: ' + result.getContent());
-    
-    // Bağlantı testi
-    Logger.log('Bağlantı testi yapılıyor...');
-    const testResult = testConnection(ss);
-    Logger.log('Bağlantı testi: ' + testResult.getContent());
-    
-    Logger.log('=== SİSTEM TEST BAŞARILI ===');
-    
-  } catch (error) {
-    Logger.log('Test hatası: ' + error.toString());
-    Logger.log('Hata detayı: ' + error.stack);
-  }
-}
-
-// Manuel kurulum fonksiyonu
-function manualSetup() {
-  const ss = getOrCreateSpreadsheet();
-  const result = initializeSystem(ss);
-  
-  Logger.log('=== BAKIM TAKİP SİSTEMİ KURULUMU ===');
-  Logger.log('Spreadsheet ID: ' + ss.getId());
-  Logger.log('URL: ' + ss.getUrl());
-  Logger.log('Sonuç: ' + result.getContent());
-  
-  return ss.getId();
-}
-
-// Drive folder test fonksiyonu
-function testDriveFolders() {
-  try {
-    Logger.log('=== DRIVE FOLDER TEST ===');
-    
-    Object.keys(DRIVE_FOLDERS).forEach(key => {
-      const folderId = DRIVE_FOLDERS[key];
-      const folder = DriveApp.getFolderById(folderId);
-      Logger.log(`${key}: ${folder.getName()} (${folderId})`);
-    });
-    
-    Logger.log('Tüm Drive folder\'ları başarıyla ulaşıldı');
-    
-  } catch (error) {
-    Logger.log('Drive folder hatası: ' + error.toString());
-  }
-}
-
-// Basit kayıt test fonksiyonu
-function testSimpleSave() {
-  try {
-    Logger.log('=== BASİT KAYIT TESTİ ===');
-    
-    const ss = getOrCreateSpreadsheet();
-    Logger.log('Spreadsheet: ' + ss.getUrl());
-    
-    const testParams = {
-      action: 'save',
-      date: '06.04.2026',
-      time: '13:43',
-      motor: 'GM-1',
-      type: 'Periyodik',
-      subtype: '2000 Saat',
-      technician: 'ibrahim-ogun',
-      company: 'internal',
-      notes: 'Test kaydı',
-      status: 'Aktif',
-      files: '[]'
-    };
-    
-    Logger.log('Test params: ' + JSON.stringify(testParams));
-    
-    const result = saveMaintenanceRecord(ss, testParams);
-    Logger.log('Test sonucu: ' + result.getContent());
-    
-    Logger.log('=== BASİT KAYIT TESTİ BAŞARILI ===');
-    
-  } catch (error) {
-    Logger.log('Basit kayıt test hatası: ' + error.toString());
-    Logger.log('Hata detayı: ' + error.stack);
-  }
 }

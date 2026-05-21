@@ -1,5 +1,6 @@
 // Bakım Takibi JavaScript - ÇALIŞAN VERSİYON
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzgjdH1kftdCxqrcUFwWMWSX7j6t0XAKVThgQjUVkwA8BlpzA5GS5VH3-ln3LP8c6NolQ/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzXXjRobF1VwVAwKEj7AE0JFE4bWYUXsgwaOwWFXJbxZ0EE0OE7GAuKaQQU3t6x6RUm/exec";
+const selectedMaintenanceFiles = { periodic: [], normal: [], fault: [] };
 
 // Sistem başlatma fonksiyonu
 async function initializeSystem() {
@@ -53,6 +54,8 @@ async function initializeSystem() {
 
 // Bakım kaydetme fonksiyonu
 async function saveMaintenanceData(formType, formElement) {
+    const submitButton = setSubmitButtonLoading(formElement, true);
+
     try {
         const formData = new FormData(formElement);
         
@@ -128,7 +131,7 @@ async function saveMaintenanceData(formType, formElement) {
             'alternator-grease': 'ALTERNATÖR GRESLEME',
             'oil-filter': 'YAĞ FİLTRE DEĞİŞİMİ',
             'heat-exchanger': 'EŞANJÖR ÖLÇÜMÜ',
-            'ht-lt-jacket': 'HT LT CEKET SUYU SICAKLIK ÖLÇÜMÜ',
+            'ht-lt-jacket': 'HT LT CEKET SUYU DEGER OLCUMU',
             'other': 'DİĞER',
             // Periyodik bakım tipleri
             '2000': '2000 SAAT',
@@ -157,7 +160,7 @@ async function saveMaintenanceData(formType, formElement) {
         console.log('  - final companyValue:', companyValue);
 
         // Yağ numune alma özel alanları
-        const motorHours = getInputValue('motor-hours');
+        const motorHours = getInputValue('motor-hours') || getInputValue('alternator-motor-hours');
         const barcodeNumber = getInputValue('barcode-number');
         
         // Alternatör gresleme özel alanları
@@ -175,8 +178,12 @@ async function saveMaintenanceData(formType, formElement) {
         const jacketTemperature = getInputValue('jacket-temperature');
         
         const params = {
-            action: 'save',
+            action: formType === 'periodic' ? 'savePeriodicMaintenanceV2' : 'save',
             date: getInputValue(`${formType}-date`) ? new Date(getInputValue(`${formType}-date`)).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
+            startDate: getInputValue(`${formType}-date`) ? new Date(getInputValue(`${formType}-date`)).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
+            endDate: getInputValue(`${formType}-end-date`) ? new Date(getInputValue(`${formType}-end-date`)).toLocaleDateString('tr-TR') : '',
+            startTime: getInputValue(`${formType}-start-time`) || '',
+            endTime: getInputValue(`${formType}-end-time`) || '',
             motor: getInputValue(`${formType}-equipment`),
             type: formType === 'periodic' ? 'Periyodik' : formType === 'normal' ? 'Normal' : 'Arıza',
             subtype: typeValue,
@@ -184,8 +191,11 @@ async function saveMaintenanceData(formType, formElement) {
             company: companyValue,
             notes: getInputValue(`${formType}-description`) || getInputValue(`${formType}-notes`),
             status: getInputValue(`${formType}-status`) || 'Aktif',
+            faultTime: getInputValue('fault-time') || '',
             files: files.length > 0 ? JSON.stringify(files) : '',
+            fileCount: String(files.length),
             motorHours: motorHours || '',
+            alternatorMotorHours: getInputValue('alternator-motor-hours') || '',
             barcodeNumber: barcodeNumber || '',
             alternatorFront: alternatorFront || '',
             alternatorRear: alternatorRear || '',
@@ -268,20 +278,44 @@ async function saveMaintenanceData(formType, formElement) {
 }
 
 // Dosyaları işle
+function setSubmitButtonLoading(formElement, isLoading, button) {
+    const submitButton = button || formElement?.querySelector('button[type="submit"]');
+    if (!submitButton) return null;
+
+    if (isLoading) {
+        if (!submitButton.dataset.originalText) {
+            submitButton.dataset.originalText = submitButton.textContent;
+        }
+        submitButton.textContent = 'Kaydediliyor...';
+        submitButton.disabled = true;
+        submitButton.classList.add('is-loading');
+    } else {
+        submitButton.textContent = submitButton.dataset.originalText || 'Kaydet';
+        submitButton.disabled = false;
+        submitButton.classList.remove('is-loading');
+    }
+
+    return submitButton;
+}
+
 async function processFiles(formType) {
     const fileInput = document.getElementById(`${formType}-files`);
+    const storedFiles = selectedMaintenanceFiles[formType] || [];
+    const sourceFiles = storedFiles.length > 0
+        ? storedFiles
+        : (fileInput && fileInput.files ? Array.from(fileInput.files) : []);
     console.log('Dosya input elementi:', fileInput);
     console.log('Dosya sayısı:', fileInput ? fileInput.files.length : 0);
     
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    if (sourceFiles.length === 0) {
         console.log('Dosya bulunamadı');
         return [];
     }
     
     const files = [];
     
-    for (let i = 0; i < fileInput.files.length; i++) {
-        const file = fileInput.files[i];
+    for (let i = 0; i < sourceFiles.length; i++) {
+        const file = sourceFiles[i];
         console.log(`Dosya ${i + 1}:`, file.name, 'Tip:', file.type, 'Boyut:', file.size);
         
         try {
@@ -317,6 +351,7 @@ function fileToBase64(file) {
 function clearFileLists(formType) {
     const fileInput = document.getElementById(`${formType}-files`);
     const fileList = document.getElementById(`${formType}-file-list`);
+    selectedMaintenanceFiles[formType] = [];
     
     if (fileInput) {
         fileInput.value = '';
@@ -983,12 +1018,16 @@ function setupChartButtons() {
 function setAutoDate() {
     const today = new Date();
     const dateString = today.toISOString().split('T')[0]; // yyyy-MM-dd format
+    const timeString = today.toTimeString().slice(0, 5); // HH:mm format
     
     // Tüm tarih input'larını otomatik doldur
     const dateInputs = [
         'periodic-date',
+        'periodic-end-date',
         'normal-date', 
-        'fault-date'
+        'normal-end-date',
+        'fault-date',
+        'fault-end-date'
     ];
     
     dateInputs.forEach(id => {
@@ -998,10 +1037,29 @@ function setAutoDate() {
             console.log(`Otomatik tarih ayarlandı ${id}: ${dateString}`);
         }
     });
+    const timeInputs = [
+        'periodic-start-time',
+        'periodic-end-time',
+        'normal-start-time',
+        'normal-end-time',
+        'fault-start-time',
+        'fault-end-time'
+    ];
+
+    timeInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input && !input.value) {
+            input.value = timeString;
+            console.log(`Otomatik saat ayarlandi ${id}: ${timeString}`);
+        }
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('=== SAYFA YUKLENDI ===');
+    if (typeof renderModernMaintenanceForms === 'function') {
+        renderModernMaintenanceForms();
+    }
     
     // Sayfa yuklendiginde tarihleri ayarla
     setAutoDate();
@@ -1030,6 +1088,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         checkMaintenanceReminders();
     }, 3000);
+
+    setTimeout(() => {
+        checkPeriodicMaintenance();
+    }, 3500);
     
     // Yag numune kontrolunu baslat
     setTimeout(() => {
@@ -1039,15 +1101,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Form submit olaylarını güncelle
     document.querySelector('#periodic-form form')?.addEventListener('submit', (e) => {
         e.preventDefault();
-        saveMaintenanceData('periodic', e.target);
+        saveMaintenanceData('periodic', e.target).finally(() => setSubmitButtonLoading(e.target, false));
     });
     document.querySelector('#normal-form form')?.addEventListener('submit', (e) => {
         e.preventDefault();
-        saveMaintenanceData('normal', e.target);
+        saveMaintenanceData('normal', e.target).finally(() => setSubmitButtonLoading(e.target, false));
     });
     document.querySelector('#fault-form form')?.addEventListener('submit', (e) => {
         e.preventDefault();
-        saveMaintenanceData('fault', e.target);
+        saveMaintenanceData('fault', e.target).finally(() => setSubmitButtonLoading(e.target, false));
     });
     
     // Sistem otomatik başlatıldığı için butona gerek yok
@@ -1059,7 +1121,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sidebarLogout) {
         sidebarLogout.addEventListener('click', function() {
             if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-                window.location.href = 'giris.html';
+                window.location.href = 'index.html';
             }
         });
     }
@@ -1067,7 +1129,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (headerLogout) {
         headerLogout.addEventListener('click', function() {
             if (confirm('Çıkış yapmak istediğinizden emin misiniz?')) {
-                window.location.href = 'giris.html';
+                window.location.href = 'index.html';
             }
         });
     }
@@ -1181,6 +1243,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const area = document.getElementById(areaId);
         const input = document.getElementById(inputId);
         const list = document.getElementById(listId);
+        const formType = inputId.replace('-files', '');
                 
         console.log(`[initFileUpload] ${areaId}:`, { area: !!area, input: !!input, list: !!list });
                 
@@ -1217,19 +1280,33 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log(`[${inputId}] ${input.files.length} dosya seçildi, listeleniyor...`);
             
+            selectedMaintenanceFiles[formType] = Array.from(input.files);
             list.innerHTML = '';
-            Array.from(input.files).forEach(file => {
+            selectedMaintenanceFiles[formType].forEach(file => {
                 const div = document.createElement('div');
                 div.className = 'file-item';
                 div.innerHTML = `<span>📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)</span>
-                                <button class="file-remove" data-name="${file.name}">&times;</button>`;
+                                <button type="button" class="file-remove" data-name="${file.name}">&times;</button>`;
                 list.appendChild(div);
             });
             
             console.log(`[${inputId}] Input temizleniyor...`);
-            const selectedFiles = Array.from(input.files);
             const dt = new DataTransfer();
-            selectedFiles.forEach(f => dt.items.add(f));
+            selectedMaintenanceFiles[formType].forEach(f => dt.items.add(f));
+            input.files = dt.files;
+        });
+
+        list.addEventListener('click', (e) => {
+            const removeButton = e.target.closest('.file-remove');
+            if (!removeButton) return;
+
+            const fileName = removeButton.dataset.name;
+            selectedMaintenanceFiles[formType] = (selectedMaintenanceFiles[formType] || [])
+                .filter(file => file.name !== fileName);
+            removeButton.closest('.file-item')?.remove();
+
+            const dt = new DataTransfer();
+            selectedMaintenanceFiles[formType].forEach(file => dt.items.add(file));
             input.files = dt.files;
         });
         
@@ -1271,7 +1348,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function getNormalPriorityText(val) {
         const map = { 'alternator-grease': 'Alternatör Gresleme', 'oil-sample': 'Yağ Numune Alma',
                       'oil-filter': 'Yağ Filtre Değişimi', 'heat-exchanger': 'Eşanjör Ölçümü',
-                      'ht-lt-jacket': 'HT LT Ceket Suyu Sıcaklık Ölçümü', 'other': 'Diğer' };
+                      'ht-lt-jacket': 'HT LT Ceket Suyu Deger Olcumu', 'other': 'Diğer' };
         return map[val] || val;
     }
     function getFaultReasonText(val) {
@@ -1790,9 +1867,52 @@ async function closeRecord(recordNo) {
 // ========== YAĞ NUMUNE KONTROLÜ ==========
 
 // Motor saatlerini getir ve kontrol et
+async function checkPeriodicMaintenance() {
+    console.log('Periyodik bakim kontrolu baslatiliyor...');
+
+    try {
+        const response = await fetch(`${SCRIPT_URL}?action=getPeriodicMaintenanceStatus`);
+        const data = await response.json();
+
+        if (data.success && data.motors) {
+            displayPeriodicMaintenanceNotifications(data.motors);
+        } else {
+            console.log('Periyodik bakim durumu alinamadi:', data.message);
+        }
+    } catch (error) {
+        console.error('Periyodik bakim kontrolunde hata:', error);
+    }
+}
+
+function displayPeriodicMaintenanceNotifications(motors) {
+    (motors || []).forEach(motor => {
+        const typeText = `${motor.nextMaintenanceType} saat bakimi`;
+        const remainingText = formatMaintenanceRemaining(motor.remainingHours);
+
+        if (motor.needsMaintenance) {
+            showNotification(
+                'Periyodik Bakim Zamani',
+                `${motor.motor} icin ${typeText} geldi. Guncel saat: ${motor.currentHours}.`,
+                'error'
+            );
+        } else if (motor.warnsMaintenance) {
+            showNotification(
+                'Periyodik Bakim Yaklasiyor',
+                `${motor.motor} icin ${typeText} yaklasiyor. ${remainingText}. Esik: ${motor.nextThreshold}.`,
+                'warning'
+            );
+        }
+    });
+}
+
 async function checkOilSamples() {
     console.log('Yağ numune kontrolü başlatılıyor...');
     
+    if (!isCurrentUserAdmin()) {
+        console.log('Bakim bildirimleri sadece admin kullanicilar icin gosterilir.');
+        return;
+    }
+
     try {
         const url = `${SCRIPT_URL}?action=getMotorHours`;
         
@@ -1823,13 +1943,14 @@ function displayOilSampleNotifications(motors) {
     
     motors.forEach(motor => {
         // Yağ numune kontrolü (50 saat kala uyarı)
-        if (motor.needsOilSample) {
+        const hasOilPlan = Number(motor.nextOilSampleHours || 0) > 0;
+        if (hasOilPlan && motor.needsOilSample) {
             oilAlerts.push({
                 motor: motor.motor,
                 message: `${motor.motor} için YAĞ NUMUNE alma zamanı geldi! ${formatMaintenanceRemaining(motor.remainingOilHours)}`,
                 type: 'urgent'
             });
-        } else if (motor.warnsOilSample || motor.remainingOilHours <= 100) {
+        } else if (hasOilPlan && (motor.warnsOilSample || motor.warnsOilSampleUrgent || motor.remainingOilHours <= 100)) {
             oilWarnings.push({
                 motor: motor.motor,
                 message: `${motor.motor} için yağ numune alma yaklaşıyor. ${formatMaintenanceRemaining(motor.remainingOilHours)}`,
@@ -1854,6 +1975,16 @@ function displayOilSampleNotifications(motors) {
     });
     
     // Yağ numune bildirimleri
+    altAlerts.forEach(alert => {
+        const motor = motors.find(item => item.motor === alert.motor) || {};
+        alert.message = `${alert.motor}: ALTERNATOR GRESLEME zamani geldi. Guncel saat: ${motor.currentHours || '-'}, esik: ${motor.nextAlternatorGreaseHours || '-'}.`;
+    });
+
+    altWarnings.forEach(warning => {
+        const motor = motors.find(item => item.motor === warning.motor) || {};
+        warning.message = `${warning.motor}: alternator gresleme yaklasiyor. ${formatMaintenanceRemaining(motor.remainingAltHours)}. Esik: ${motor.nextAlternatorGreaseHours || '-'}.`;
+    });
+
     if (oilAlerts.length > 0) {
         oilAlerts.forEach(alert => {
             showNotification('⚠️ Yağ Numune Zamanı', alert.message, 'error', 10000);
@@ -1867,6 +1998,15 @@ function displayOilSampleNotifications(motors) {
     }
     
     // Alternatör gresleme bildirimleri
+    if (altAlerts.length > 0 || altWarnings.length > 0) {
+        const title = altAlerts.length > 0 ? 'Alternator Gresleme Zamani' : 'Alternator Gresleme Yaklasiyor';
+        const type = altAlerts.length > 0 ? 'error' : 'warning';
+        const messages = altAlerts.concat(altWarnings).map(item => item.message).join('<br>');
+        showNotification(title, messages, type);
+        altAlerts.length = 0;
+        altWarnings.length = 0;
+    }
+
     if (altAlerts.length > 0) {
         altAlerts.forEach(alert => {
             showNotification('🔧 Alternatör Gresleme Zamanı', alert.message, 'error', 10000);
@@ -1883,6 +2023,15 @@ function displayOilSampleNotifications(motors) {
 }
 
 // Motor saati güncelle
+function isCurrentUserAdmin() {
+    try {
+        const user = JSON.parse(localStorage.getItem('loggedInUser') || 'null');
+        return !!user && user.role === 'admin';
+    } catch (error) {
+        return false;
+    }
+}
+
 async function updateMotorHours(motor, hours) {
     console.log(`Motor saati güncelleniyor: ${motor} = ${hours}`);
     

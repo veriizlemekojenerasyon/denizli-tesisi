@@ -95,7 +95,7 @@ function saatlikHandleRequest(e) {
 }
 
 function saatlikIsWriteAction(action) {
-  return ['saveRecord', 'addRecord', 'updateRecord', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingRecordsForDate', 'fillMissingRecordGaps', 'fillMissingFullDay', 'installHourlyMissingRecordTrigger', 'addSystemLog'].indexOf(action) !== -1;
+  return ['saveRecord', 'addRecord', 'updateRecord', 'sendEmail', 'fillMissingRecordsForDate', 'fillMissingRecordGaps', 'fillMissingFullDay', 'installHourlyMissingRecordTrigger', 'addSystemLog'].indexOf(action) !== -1;
 }
 
 function getSaatlikSheet(createIfMissing) {
@@ -357,7 +357,10 @@ function saatlikGetRecordByDateTime(tarih, saat) {
 
 // Tarih formatı (dd.MM.yyyy)
 function saatlikCheckHourlyMissingRecords() {
+  var lock = LockService.getScriptLock();
   try {
+    lock.waitLock(30000);
+
     var now = new Date();
     var target = saatlikGetHourlyCheckTarget(now);
     var tarih = target.tarih;
@@ -366,6 +369,7 @@ function saatlikCheckHourlyMissingRecords() {
     var props = PropertiesService.getScriptProperties();
 
     if (props.getProperty(sentKey)) {
+      lock.releaseLock();
       return { success: true, skipped: true, message: 'Bu saat daha once kontrol edildi' };
     }
 
@@ -381,6 +385,7 @@ function saatlikCheckHourlyMissingRecords() {
         mailSonucu: 'Gonderilmedi',
         detay: 'Kayit mevcut'
       });
+      lock.releaseLock();
       return { success: true, missing: false, added: false, message: 'Kayit mevcut' };
     }
 
@@ -397,29 +402,41 @@ function saatlikCheckHourlyMissingRecords() {
       notlar: 'KAYIT GIRILMEDI - OTOMATIK'
     });
 
-    var subject = 'Saatlik Veri Girisi Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
-    var body = 'Saatlik Veri Girisi Uyarisi\n\n' +
-      'Tarih: ' + tarih + '\n' +
-      'Saat: ' + saat + '\n' +
-      'Vardiya: ' + vardiya + '\n\n' +
-      'Bu saat icin saatlik veri girilmedi. Sistem otomatik bos kayit olusturdu.\n\n' +
-      'Otomatik kayit sonucu: ' + (addResult.success ? 'Basarili' : addResult.error);
-
-    var mailResult = saatlikSendEmailAlert({ subject: subject, body: body });
     if (addResult.success) {
       props.setProperty(sentKey, new Date().toISOString());
     }
+
+    var mailResult = { success: false, skipped: true, error: '' };
+    if (addResult.success) {
+      var subject = 'Saatlik Veri Girisi Uyarisi - ' + tarih + ' ' + saat + ' Kayit Girilmedi';
+      var body = 'Saatlik Veri Girisi Uyarisi\n\n' +
+        'Tarih: ' + tarih + '\n' +
+        'Saat: ' + saat + '\n' +
+        'Vardiya: ' + vardiya + '\n\n' +
+        'Bu saat icin saatlik veri girilmedi. Sistem otomatik bos kayit olusturdu.\n\n' +
+        'Otomatik kayit sonucu: Basarili';
+
+      mailResult = saatlikSendEmailAlert({ subject: subject, body: body });
+    } else {
+      var afterAddCheck = saatlikGetRecordByDateTime(tarih, saat);
+      if (afterAddCheck.success && afterAddCheck.found) {
+        props.setProperty(sentKey, new Date().toISOString());
+        addResult = { success: true, message: 'Kayit baska calisma tarafindan eklendi' };
+      }
+    }
+
     saatlikAddSystemLog({
       tarih: tarih,
       saat: saat,
       modul: 'Saatlik Veri',
       eksikKayit: 'Saatlik kayit yok',
       otomatikKayitSonucu: addResult.success ? 'Basarili' : 'Basarisiz',
-      mailSonucu: mailResult.success ? 'Basarili' : 'Basarisiz',
-      hataMesaji: addResult.success ? (mailResult.success ? '' : mailResult.error) : addResult.error,
+      mailSonucu: mailResult.success ? 'Basarili' : 'Gonderilmedi',
+      hataMesaji: addResult.success ? (mailResult.success || mailResult.skipped ? '' : mailResult.error) : addResult.error,
       detay: 'Otomatik bos kayit kontrolu'
     });
 
+    lock.releaseLock();
     return {
       success: true,
       missing: true,
@@ -428,6 +445,9 @@ function saatlikCheckHourlyMissingRecords() {
       mail: mailResult
     };
   } catch (error) {
+    try {
+      lock.releaseLock();
+    } catch (lockError) {}
     saatlikAddSystemLog({
       modul: 'Saatlik Veri',
       otomatikKayitSonucu: 'Hata',
@@ -870,7 +890,8 @@ function saatlikGetTriggerHealth() {
     var triggers = ScriptApp.getProjectTriggers();
     var hourlyTriggers = [];
     for (var i = 0; i < triggers.length; i++) {
-      if (triggers[i].getHandlerFunction() === 'saatlikCheckHourlyMissingRecords') {
+      if (triggers[i].getHandlerFunction() === 'saatlikCheckHourlyMissingRecords' ||
+          triggers[i].getHandlerFunction() === 'checkHourlyMissingRecords') {
         hourlyTriggers.push({
           handler: triggers[i].getHandlerFunction(),
           source: String(triggers[i].getTriggerSource()),

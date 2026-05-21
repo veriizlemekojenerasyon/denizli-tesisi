@@ -1,9 +1,10 @@
 ﻿const AdminControlConfig = {
-    saatlik: 'https://script.google.com/macros/s/AKfycbxKo1fwJBYHGNbrrIW5agfYkAqLSj8nVbKzbi2OXoeTLM7oZLyfNSMqQP-uGIsDQp5y/exec',
+    saatlik: 'https://script.google.com/macros/s/AKfycbzzpkF4RJJ46d9A9518oxSwGaeuSgw-VHodQ5hjCApqb1H0FuIEnYNsqGOSdWXf9Yc/exec',
     motor: 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec',
     enerji: 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec',
     buhar: 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec',
     gunluk: 'https://script.google.com/macros/s/AKfycbwNka_9UemxV0HPBVA02qUE2ayzICY4OH0Ms3uBx4VupMB-4UZlnvNhCoeV6SRzkAFy/exec',
+    bakim: 'https://script.google.com/macros/s/AKfycbzXXjRobF1VwVAwKEj7AE0JFE4bWYUXsgwaOwWFXJbxZ0EE0OE7GAuKaQQU3t6x6RUm/exec',
     vardiya: 'https://script.google.com/macros/s/AKfycby4xRMYihfe_73NI-wMCvioTG6PrZilWAIBdA0n7dbJl6Nq9oJ-Va6IL-60_9OMNX3P/exec',
     bildirim: 'https://script.google.com/macros/s/AKfycbz9uR24xQeuV85ygxfFiakRRJz601KgaKCgOlHcsuYDjUl5xkR4o3HbIVn-tgVdSnTF/exec'
 };
@@ -14,8 +15,48 @@ const AdminControlLabels = {
     enerji: 'Kojen Enerji',
     buhar: 'Buhar',
     gunluk: 'Gunluk Veri',
+    bakim: 'Bakim Takip',
     vardiya: 'Vardiya',
     bildirim: 'Bildirim'
+};
+
+const AdminTriggerModules = {
+    saatlik: {
+        title: 'Saatlik Veri',
+        healthAction: 'getTriggerHealth',
+        installAction: 'installHourlyMissingRecordTrigger',
+        testAction: 'checkHourlyMissingRecords'
+    },
+    motor: {
+        title: 'Kojen Motor',
+        healthAction: 'getTriggerHealth',
+        installAction: 'installHourlyMissingRecordTrigger',
+        testAction: 'checkHourlyMissingRecords'
+    },
+    enerji: {
+        title: 'Kojen Enerji',
+        healthAction: 'getTriggerHealth',
+        installAction: 'installHourlyMissingRecordTrigger',
+        testAction: 'checkHourlyMissingRecords'
+    },
+    buhar: {
+        title: 'Buhar',
+        healthAction: 'getTriggerHealth',
+        installAction: 'installHourlyMissingRecordTrigger',
+        testAction: 'checkHourlyMissingRecords'
+    },
+    gunluk: {
+        title: 'Gunluk Veri',
+        healthAction: 'getTriggerHealth',
+        installAction: 'installHourlyMissingRecordTrigger',
+        testAction: 'checkHourlyMissingRecords'
+    },
+    bakim: {
+        title: 'Bakim Takip',
+        healthAction: 'getMaintenanceTriggers',
+        installAction: 'installMaintenanceTriggers',
+        testAction: 'runMaintenanceCheck'
+    }
 };
 
 const AdminBackupModules = {
@@ -113,21 +154,13 @@ async function loadDashboard() {
 }
 
 async function loadDeferredAdminData() {
-    const [saatlikHealth, motorHealth, enerjiHealth, buharHealth, gunlukHealth] = await Promise.all([
-        fetchJson(AdminControlConfig.saatlik, { action: 'getTriggerHealth' }),
-        fetchJson(AdminControlConfig.motor, { action: 'getTriggerHealth' }),
-        fetchJson(AdminControlConfig.enerji, { action: 'getTriggerHealth' }),
-        fetchJson(AdminControlConfig.buhar, { action: 'getTriggerHealth' }),
-        fetchJson(AdminControlConfig.gunluk, { action: 'getTriggerHealth' })
-    ]);
+    const items = await Promise.all(Object.keys(AdminTriggerModules).map(async key => {
+        const module = AdminTriggerModules[key];
+        const result = await fetchJson(AdminControlConfig[key], { action: module.healthAction });
+        return { key, title: module.title, result: normalizeTriggerHealth(result) };
+    }));
 
-    renderTriggerHealth([
-        { key: 'saatlik', title: 'Saatlik Veri', result: saatlikHealth },
-        { key: 'motor', title: 'Kojen Motor', result: motorHealth },
-        { key: 'enerji', title: 'Kojen Enerji', result: enerjiHealth },
-        { key: 'buhar', title: 'Buhar', result: buharHealth },
-        { key: 'gunluk', title: 'Gunluk Veri', result: gunlukHealth }
-    ]);
+    renderTriggerHealth(items);
     await renderLogs();
 }
 
@@ -412,9 +445,9 @@ function renderUserActivity() {
 async function installAllTriggers() {
     const box = document.getElementById('testResultBox');
     if (box) box.textContent = 'Tetikleyiciler kuruluyor...';
-    const modules = ['saatlik', 'motor', 'enerji', 'buhar', 'gunluk'];
+    const modules = Object.keys(AdminTriggerModules);
     const results = await Promise.all(modules.map(moduleName =>
-        fetchJson(AdminControlConfig[moduleName], { action: 'installHourlyMissingRecordTrigger' })
+        fetchJson(AdminControlConfig[moduleName], { action: AdminTriggerModules[moduleName].installAction })
             .then(result => ({ moduleName, result }))
     ));
     const summary = results.map(item => `${AdminControlLabels[item.moduleName]}: ${item.result.success ? 'kuruldu' : item.result.error}`).join(' | ');
@@ -426,13 +459,27 @@ async function installAllTriggers() {
 async function runModuleTest(moduleName) {
     const box = document.getElementById('testResultBox');
     if (box) box.textContent = `${AdminControlLabels[moduleName] || moduleName} testi calisiyor...`;
-    const result = await fetchJson(AdminControlConfig[moduleName], { action: 'checkHourlyMissingRecords' });
+    const action = AdminTriggerModules[moduleName]?.testAction || 'checkHourlyMissingRecords';
+    const result = await fetchJson(AdminControlConfig[moduleName], { action });
     const summary = result.success
         ? `${AdminControlLabels[moduleName]}: ${result.message || `eksik=${result.missingCount ?? result.missing ?? '-'}, eklenen=${result.addedCount ?? result.added ?? '-'}`}`
         : `${AdminControlLabels[moduleName]}: ${result.error}`;
     if (box) box.textContent = summary;
     await postCentralLog('Manuel test', summary, result.success ? 'ok' : 'danger');
     loadDashboard();
+}
+
+function normalizeTriggerHealth(result) {
+    if (!result.success) return result;
+    if (typeof result.installed !== 'undefined') return result;
+
+    const triggers = Array.isArray(result.triggers) ? result.triggers : [];
+    return {
+        ...result,
+        installed: triggers.length > 0,
+        triggerCount: triggers.length,
+        lastLog: result.lastLog || null
+    };
 }
 
 async function runTestMail() {
