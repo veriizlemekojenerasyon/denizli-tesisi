@@ -1,5 +1,5 @@
 // Google Apps Script URL - Global
-const USER_URL = 'https://script.google.com/macros/s/AKfycbx4PqsgAuIvRCfafyqPv30sJf_Pv5hBVXbL8nTorr7LhcbHudFPwMB-CQRM4SoXqH2bYQ/exec';
+const USER_URL = 'https://script.google.com/macros/s/AKfycbzt8MaQa9ikOO8gS0WbLhKjxJoFMXIrtj0It1U-8yMyQhFRE1rBnKlHJeG31n0tnnWB/exec';
 
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('loginForm');
@@ -221,6 +221,11 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             localStorage.setItem('loggedInUser', JSON.stringify(userData));
             localStorage.setItem('currentUser', JSON.stringify(userData));
+            if (userData.role === 'admin') {
+                sessionStorage.setItem('adminTriggerCheckPending', '1');
+            } else {
+                sessionStorage.removeItem('adminTriggerCheckPending');
+            }
 
             showSuccess('Giriş başarılı! Yönlendiriliyorsunuz...');
             

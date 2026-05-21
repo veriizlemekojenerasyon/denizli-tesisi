@@ -124,7 +124,7 @@ function isRecordExists(tarih, saat) {
 }
 
 // Google Apps Script URL
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyrYeuUQcK8c2V7iWnmkEz8al6sdVqRdXMlKGrwmYAaD2BKUkyvxm9LUL1KgzxvA0Ae/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbySQpjSWkHLMppL6lhNTxw0Q1UzM6BAB3Rc4FF3mr3IsDqPUa1vJtA4kexQxkuRoK8Y/exec';
 
 // Kayıtları Yükle - Sadece Google Apps Script'ten çek (LocalStorage devre dışı)
 async function loadRecords() {

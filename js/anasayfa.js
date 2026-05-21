@@ -36,10 +36,19 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     // Buhar verisi config
-    const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec';
-    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJ8blNcpF-gPVYv81fYE1dzQLvDzz1WTKEo5oeZDplWbFoV39M5TL-oDGYlp1q5elCqA/exec';
-    const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec';
+    const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec';
+    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec';
+    const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec';
     const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzgjdH1kftdCxqrcUFwWMWSX7j6t0XAKVThgQjUVkwA8BlpzA5GS5VH3-ln3LP8c6NolQ/exec';
+    const SAATLIK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxKo1fwJBYHGNbrrIW5agfYkAqLSj8nVbKzbi2OXoeTLM7oZLyfNSMqQP-uGIsDQp5y/exec';
+    const GUNLUK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNka_9UemxV0HPBVA02qUE2ayzICY4OH0Ms3uBx4VupMB-4UZlnvNhCoeV6SRzkAFy/exec';
+    const ADMIN_TRIGGER_MODULES = [
+        { key: 'saatlik', label: 'Saatlik Veri', url: SAATLIK_APPS_SCRIPT_URL },
+        { key: 'motor', label: 'Kojen Motor', url: KOJEN_MOTOR_APPS_SCRIPT_URL },
+        { key: 'enerji', label: 'Kojen Enerji', url: KOJEN_ENERJI_APPS_SCRIPT_URL },
+        { key: 'buhar', label: 'Buhar', url: BUHAR_APPS_SCRIPT_URL },
+        { key: 'gunluk', label: 'Gunluk Veri', url: GUNLUK_APPS_SCRIPT_URL }
+    ];
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
     const defaultAnnouncements = [
         {
@@ -60,6 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sayfa yüklendiğinde verileri göster
     setTimeout(loadDashboardData, 1000);
     setInterval(loadDashboardData, 5 * 60 * 1000);
+    setTimeout(ensureAdminTriggersAfterLogin, 1800);
 
     async function loadDashboardData() {
         const dashboardLoaded = await loadDashboardSummary();
@@ -228,6 +238,72 @@ document.addEventListener('DOMContentLoaded', function() {
             return JSON.parse(localStorage.getItem('loggedInUser') || 'null');
         } catch (error) {
             return null;
+        }
+    }
+
+    async function ensureAdminTriggersAfterLogin() {
+        const user = getLoggedInUser();
+        if (user?.role !== 'admin') return;
+        if (sessionStorage.getItem('adminTriggerCheckPending') !== '1') return;
+
+        try {
+            const healthResults = await Promise.all(ADMIN_TRIGGER_MODULES.map(async module => ({
+                module,
+                result: await fetchTriggerJson(module.url, { action: 'getTriggerHealth' })
+            })));
+            const missing = healthResults.filter(item => item.result.success && !item.result.installed);
+            const failedChecks = healthResults.filter(item => !item.result.success);
+
+            if (!missing.length && !failedChecks.length) {
+                showNotification('Tetikleyiciler kurulu.', 'success');
+                return;
+            }
+
+            if (missing.length) {
+                showNotification(
+                    `Eksik tetikleyici: ${missing.map(item => item.module.label).join(', ')}. Kurulum baslatildi.`,
+                    'warning'
+                );
+
+                const installResults = await Promise.all(missing.map(async item => ({
+                    module: item.module,
+                    result: await fetchTriggerJson(item.module.url, { action: 'installHourlyMissingRecordTrigger' })
+                })));
+                const installErrors = installResults.filter(item => !item.result.success);
+
+                if (installErrors.length) {
+                    showNotification(
+                        `Tetikleyici kurulum hatasi: ${installErrors.map(item => item.module.label).join(', ')}`,
+                        'error'
+                    );
+                } else {
+                    showNotification('Eksik tetikleyiciler kuruldu.', 'success');
+                }
+            }
+
+            if (failedChecks.length) {
+                showNotification(
+                    `Tetikleyici kontrol hatasi: ${failedChecks.map(item => item.module.label).join(', ')}`,
+                    'error'
+                );
+            }
+        } catch (error) {
+            console.error('Admin tetikleyici kontrolu calisamadi:', error);
+            showNotification('Tetikleyici kontrolu yapilamadi.', 'error');
+        } finally {
+            sessionStorage.removeItem('adminTriggerCheckPending');
+        }
+    }
+
+    async function fetchTriggerJson(baseUrl, params) {
+        try {
+            const url = new URL(baseUrl);
+            Object.keys(params).forEach(key => url.searchParams.set(key, params[key]));
+            const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+            const result = await response.json();
+            return result.success ? result : { success: false, error: result.error || 'Servis hatasi' };
+        } catch (error) {
+            return { success: false, error: error.message || String(error) };
         }
     }
 

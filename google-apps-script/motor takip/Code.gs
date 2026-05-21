@@ -3,12 +3,12 @@
  * Drive'a fotoğraf yükleme ve Sheets'e kayıt yapma
  * 
  * Drive Klasör: https://drive.google.com/drive/folders/1ae4WbGS2qXnKcJc9gX7Dc0Od2kSoTYiM
- * Sheets: https://docs.google.com/spreadsheets/d/1226RpbRSRp4ryBgUVxw69wPwcmJq0wHQ0OafEHqnuoo/edit
+ * Sheets: https://docs.google.com/spreadsheets/d/1ep4yY5U_QRghohq6DtkbG68KT8MMFLVMXe6S7atd2AQ/edit
  */
 
 // === AYARLAR ===
 const DRIVE_FOLDER_ID = '1ae4WbGS2qXnKcJc9gX7Dc0Od2kSoTYiM';
-const SHEET_ID = '1226RpbRSRp4ryBgUVxw69wPwcmJq0wHQ0OafEHqnuoo';
+const SHEET_ID = '1ep4yY5U_QRghohq6DtkbG68KT8MMFLVMXe6S7atd2AQ';
 const SHEET_NAME = 'Motor Takip'; // Sayfa adı
 
 /**

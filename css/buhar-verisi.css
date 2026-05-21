@@ -522,6 +522,23 @@ body {
 }
 
 /* Responsive Tasarım */
+.submit-btn.is-saving,
+.submit-btn.is-saving:hover {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    cursor: wait;
+    transform: none;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+}
+
+.save-status {
+    min-height: 22px;
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #b45309;
+    text-align: center;
+}
+
 @media (max-width: 1024px) {
     .sidebar {
         width: 240px;

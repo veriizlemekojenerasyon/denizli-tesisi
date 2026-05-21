@@ -96,6 +96,9 @@ function handleRequest(e) {
       case 'updateYearlyEnergySummarySheet':
         result = updateYearlyEnergySummarySheet(params.year);
         break;
+      case 'updateYearlyEnergySummaryFromExistingSheets':
+        result = updateYearlyEnergySummaryFromExistingSheets(params.year);
+        break;
       case 'backupYearlyEnergySheets':
         result = backupYearlyEnergySheets(params.year);
         break;
@@ -116,7 +119,7 @@ function handleRequest(e) {
 }
 
 function isWriteAction(action) {
-  return ['addRecord', 'addMultipleRecords', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingFullDay', 'sortEnergySheet', 'colorizeEnergySheet', 'installHourlyMissingRecordTrigger', 'updateYearlyEnergySheet', 'updateYearlyEnergySummarySheet', 'backupYearlyEnergySheets'].indexOf(action) !== -1;
+  return ['addRecord', 'addMultipleRecords', 'sendEmail', 'checkHourlyMissingRecords', 'fillMissingFullDay', 'sortEnergySheet', 'colorizeEnergySheet', 'installHourlyMissingRecordTrigger', 'updateYearlyEnergySheet', 'updateYearlyEnergySummarySheet', 'updateYearlyEnergySummaryFromExistingSheets', 'backupYearlyEnergySheets'].indexOf(action) !== -1;
 }
 
 function getApiHealth() {
@@ -145,6 +148,7 @@ function getApiHealth() {
       'getSystemLogs',
       'updateYearlyEnergySheet',
       'updateYearlyEnergySummarySheet',
+      'updateYearlyEnergySummaryFromExistingSheets',
       'backupYearlyEnergySheets'
     ],
     examples: {
@@ -152,6 +156,7 @@ function getApiHealth() {
       lastRecords: '?action=getLastRecords&count=10',
       yearlyEnergy: '?action=updateYearlyEnergySheet&year=2026',
       yearlySummary: '?action=updateYearlyEnergySummarySheet&year=2026',
+      yearlySummaryFromExistingSheets: '?action=updateYearlyEnergySummaryFromExistingSheets&year=2026',
       yearlyBackup: '?action=backupYearlyEnergySheets&year=2026'
     }
   };
@@ -930,9 +935,9 @@ function getDashboardMaintenanceSummary(records) {
 
 function fetchDashboardExternalData() {
   var urls = {
-    motor: 'https://script.google.com/macros/s/AKfycbypZZvZOt4c8PVq0AZXQse_O3PLxkIC6hX3jcplEapwUusKsUp9_OxxLzj80idSqUza-w/exec?action=getLastRecords&count=100',
-    buhar: 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec?action=getLastRecords&count=1',
-    announcements: 'https://script.google.com/macros/s/AKfycbyjW5gbtw0BRHjDlmeLYmaio0UQWw8DG1B89X85BYwI-dw4YqaTuEPYilmv6B_xrXDmTA/exec?action=getAnnouncements&active=true'
+    motor: 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec?action=getLastRecords&count=100',
+    buhar: 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec?action=getLastRecords&count=1',
+    announcements: 'https://script.google.com/macros/s/AKfycbz9uR24xQeuV85ygxfFiakRRJz601KgaKCgOlHcsuYDjUl5xkR4o3HbIVn-tgVdSnTF/exec?action=getAnnouncements&active=true'
   };
 
   var keys = ['motor', 'buhar', 'announcements'];
@@ -1490,7 +1495,7 @@ function updateYearlyEnergySummarySheet(year) {
     var targetYear = parseInt(year, 10) || new Date().getFullYear();
     var model = buildYearlyEnergySummaryModelFromYearlySheets(targetYear);
     var sheet = getOrCreateYearlyEnergySummarySheet(targetYear);
-    renderYearlyEnergySummarySheet(sheet, model);
+    renderYearlyEnergySummarySheet(sheet, model, { skipBackup: true });
 
     return {
       success: true,
@@ -1502,6 +1507,10 @@ function updateYearlyEnergySummarySheet(year) {
   } catch (error) {
     return { success: false, error: error.toString() };
   }
+}
+
+function updateYearlyEnergySummaryFromExistingSheets(year) {
+  return updateYearlyEnergySummarySheet(year);
 }
 
 function buildYearlyEnergySummaryModelFromYearlySheets(year) {
@@ -1738,10 +1747,13 @@ function buildYearlyEnergyDailyMetric(rows) {
   };
 }
 
-function renderYearlyEnergySummarySheet(sheet, model) {
+function renderYearlyEnergySummarySheet(sheet, model, options) {
+  var opts = options || {};
   var totalRows = getYearlyEnergySummaryRowCount();
   var totalCols = getYearlyEnergySummaryColumnCount(model);
-  backupSheetBeforeFullRender(sheet, 'Yillik enerji toplam tam guncelleme');
+  if (opts.skipBackup !== true) {
+    backupSheetBeforeFullRender(sheet, 'Yillik enerji toplam tam guncelleme');
+  }
   ensureSheetGridSize(sheet, totalRows, totalCols);
   sheet.getDataRange().breakApart();
   sheet.clear();

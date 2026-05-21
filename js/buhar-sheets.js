@@ -13,7 +13,7 @@
 // ============================================
 const BUHAR_CONFIG = {
     // Google Apps Script Web App URL
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwAI0OS8V5naHu1-k0c57QwZTJgt2WeVX8pmmeT45d56wZqiFyCHv8jMLu-1StLSfwy1Q/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec',
     
     // Sayfa basligi
     PAGE_NAME: 'Buhar Verisi',
@@ -97,16 +97,54 @@ const BuharApp = {
             return;
         }
         
-        // Kaydet
-        const result = await this.addRecord(formData);
-        
-        if (result.success) {
-            this.showNotification('success', 'Basarili', result.message);
-            e.target.reset();
-            this.setDefaultDate();
-            this.loadLastRecords();
-        } else {
-            this.showNotification('error', 'Hata', result.error || 'Kayit yapilamadi!');
+        this.setSavingState(true);
+
+        try {
+            // Kaydet
+            const result = await this.addRecord(formData);
+            
+            if (result.success) {
+                this.showNotification('success', 'Basarili', result.message);
+                e.target.reset();
+                this.setDefaultDate();
+                this.loadLastRecords();
+            } else {
+                this.showNotification('error', 'Hata', result.error || 'Kayit yapilamadi!');
+            }
+        } finally {
+            this.setSavingState(false);
+        }
+    },
+
+    setSavingState: function(isSaving) {
+        const form = document.getElementById('buharForm');
+        const submitBtn = document.querySelector('#buharForm button[type="submit"]');
+        const resetBtn = document.querySelector('#buharForm button[type="reset"]');
+        const status = document.getElementById('buharSaveStatus');
+
+        if (submitBtn) {
+            if (!submitBtn.dataset.defaultText) {
+                submitBtn.dataset.defaultText = submitBtn.textContent;
+            }
+            submitBtn.disabled = isSaving;
+            submitBtn.textContent = isSaving ? 'KAYDEDILIYOR...' : submitBtn.dataset.defaultText;
+            submitBtn.classList.toggle('is-saving', isSaving);
+            submitBtn.style.cursor = isSaving ? 'wait' : 'pointer';
+            submitBtn.style.opacity = '1';
+        }
+
+        if (resetBtn) {
+            resetBtn.disabled = isSaving;
+            resetBtn.style.opacity = isSaving ? '0.6' : '1';
+            resetBtn.style.cursor = isSaving ? 'not-allowed' : 'pointer';
+        }
+
+        if (form) {
+            form.setAttribute('aria-busy', isSaving ? 'true' : 'false');
+        }
+
+        if (status) {
+            status.textContent = isSaving ? 'Kaydediliyor, lutfen bekleyin...' : '';
         }
     },
     
