@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
         dailyProduction: 0,
         dailySteam: null, // Buhar verisinden çekilecek
         pendingMaintenance: 0,
-        activeFaults: 1
+        activeFaults: 0
     };
 
     // Buhar verisi config
@@ -54,9 +54,11 @@ document.addEventListener('DOMContentLoaded', function() {
     ];
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
     const MAINTENANCE_TOTAL_CACHE_KEY = 'dashboardMaintenanceTotal';
+    const MOTOR_DATA_CACHE_KEY = 'dashboardMotorData';
     const DAILY_PRODUCTION_CACHE_KEY = 'dashboardDailyProduction';
     const DAILY_STEAM_CACHE_KEY = 'dashboardDailySteam';
     const SUMMARY_CACHE_DATE_KEY = 'dashboardSummaryCacheDate';
+    const ANNOUNCEMENT_MODAL_SHOWN_KEY = 'homeAnnouncementModalShown';
     const defaultAnnouncements = [
         {
             title: '08-16 vardiyasi: kojenerasyon saha kontrol listesi tamamlanacak',
@@ -72,8 +74,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     ];
     let dashboardAnnouncements = null;
+    let announcementsRefreshPromise = null;
+    let dashboardSummaryRefreshPromise = null;
     loadCachedMaintenanceTotal();
+    loadCachedMotorData();
     loadCachedSummaryValues();
+    loadCachedAnnouncementCount();
 
     // Sayfa yuklendiginde verileri bekletmeden goster
     loadDashboardData();
@@ -84,13 +90,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateMotorData();
         updateSummaryData();
 
-        const dashboardTask = loadDashboardSummary().then(async dashboardLoaded => {
-            updateMotorData();
-            updateSummaryData();
-        });
-
         const tasks = [
-            dashboardTask,
             updateAnnouncementTicker(),
             loadBuharData().then(updateSummaryData),
             loadLatestEnergyData().then(updateMotorData),
@@ -99,6 +99,20 @@ document.addEventListener('DOMContentLoaded', function() {
         ];
 
         await Promise.allSettled(tasks);
+        refreshDashboardSummaryInBackground();
+    }
+
+    async function refreshDashboardSummaryInBackground() {
+        if (dashboardSummaryRefreshPromise) return dashboardSummaryRefreshPromise;
+        dashboardSummaryRefreshPromise = loadDashboardSummary().then(dashboardLoaded => {
+            if (dashboardLoaded) {
+                updateMotorData();
+                updateSummaryData();
+            }
+        }).finally(() => {
+            dashboardSummaryRefreshPromise = null;
+        });
+        return dashboardSummaryRefreshPromise;
     }
 
     // Motor verilerini güncelle
@@ -107,6 +121,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!tickerTrack) return;
 
         const announcements = await getTodayAnnouncements();
+        summaryData.activeFaults = announcements.length;
+        updateSummaryData();
+        showAnnouncementsOnLogin(announcements);
         tickerTrack.innerHTML = '';
 
         if (announcements.length === 0) {
@@ -121,6 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         tickerTrack.style.animation = announcements.length === 1 ? 'tickerScroll 24s linear infinite' : '';
+        refreshAnnouncementsFromSheets();
+    }
+
+    function showAnnouncementsOnLogin(announcements) {
+        if (sessionStorage.getItem(ANNOUNCEMENT_MODAL_SHOWN_KEY) === '1') return;
+        sessionStorage.setItem(ANNOUNCEMENT_MODAL_SHOWN_KEY, '1');
+        openAnnouncementModal(Array.isArray(announcements) ? announcements : []);
     }
 
     function createTickerItem(text, priority = 'normal', category = 'general') {
@@ -159,7 +183,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 summaryData.dailySteam = result.summary.dailySteam === null || result.summary.dailySteam === undefined
                     ? null
                     : parseDashboardNumber(result.summary.dailySteam);
-                summaryData.activeFaults = parseDashboardNumber(result.summary.activeFaults);
                 cacheSummaryValues();
             }
 
@@ -175,11 +198,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     motorData[key].status = data.status === 'running' ? 'running' : 'stopped';
                 });
+                cacheMotorData();
             }
 
             if (Array.isArray(result.announcements)) {
                 dashboardAnnouncements = result.announcements;
                 localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(result.announcements));
+                const announcements = filterTodayAnnouncements(result.announcements);
+                updateAnnouncementCount(announcements);
+                renderAnnouncementTicker(announcements);
+                updateOpenAnnouncementModal(announcements);
             }
 
             if (Array.isArray(result.errors) && result.errors.length) {
@@ -198,26 +226,75 @@ document.addEventListener('DOMContentLoaded', function() {
             return filterTodayAnnouncements(dashboardAnnouncements);
         }
 
+        const cached = getCachedAnnouncements();
+        if (cached.length) {
+            return cached;
+        }
+
+        return defaultAnnouncements;
+    }
+
+    function getCachedAnnouncements() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY) || '[]');
+            if (!Array.isArray(stored) || stored.length === 0) return [];
+            return filterTodayAnnouncements(stored);
+        } catch (error) {
+            console.error('Vardiya duyurulari cache okunamadi:', error);
+            return [];
+        }
+    }
+
+    async function refreshAnnouncementsFromSheets() {
+        if (announcementsRefreshPromise) return announcementsRefreshPromise;
+        announcementsRefreshPromise = refreshAnnouncementsFromSheetsInner();
+        try {
+            return await announcementsRefreshPromise;
+        } finally {
+            announcementsRefreshPromise = null;
+        }
+    }
+
+    async function refreshAnnouncementsFromSheetsInner() {
         if (window.fetchAnnouncementsFromSheets && window.isBildirimSheetsEnabled?.()) {
             try {
                 const result = await fetchAnnouncementsFromSheets({ active: 'true' });
                 if (result.success && Array.isArray(result.data)) {
+                    dashboardAnnouncements = result.data;
                     localStorage.setItem(ANNOUNCEMENTS_STORAGE_KEY, JSON.stringify(result.data));
-                    return filterTodayAnnouncements(result.data);
+                    const announcements = filterTodayAnnouncements(result.data);
+                    renderAnnouncementTicker(announcements);
+                    updateAnnouncementCount(announcements);
+                    updateOpenAnnouncementModal(announcements);
                 }
             } catch (error) {
                 console.error('Sheets duyurulari okunamadi:', error);
             }
         }
+    }
 
-        try {
-            const stored = JSON.parse(localStorage.getItem(ANNOUNCEMENTS_STORAGE_KEY) || '[]');
-            if (!Array.isArray(stored) || stored.length === 0) return defaultAnnouncements;
-            return filterTodayAnnouncements(stored);
-        } catch (error) {
-            console.error('Vardiya duyurulari okunamadi:', error);
-            return defaultAnnouncements;
+    function updateAnnouncementCount(announcements) {
+        summaryData.activeFaults = announcements.length;
+        updateSummaryData();
+    }
+
+    function renderAnnouncementTicker(announcements) {
+        const tickerTrack = document.getElementById('announcementTickerTrack');
+        if (!tickerTrack) return;
+
+        tickerTrack.innerHTML = '';
+        if (!announcements.length) {
+            tickerTrack.appendChild(createTickerItem('Bugun icin aktif vardiya duyurusu bulunmuyor.', 'normal'));
+            tickerTrack.style.animation = 'none';
+            return;
         }
+
+        const tickerItems = [...announcements, ...announcements];
+        tickerItems.forEach(item => {
+            tickerTrack.appendChild(createTickerItem(formatTickerText(item), item.priority, item.category));
+        });
+
+        tickerTrack.style.animation = announcements.length === 1 ? 'tickerScroll 24s linear infinite' : '';
     }
 
     function filterTodayAnnouncements(items) {
@@ -331,12 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (announcementDetailsBtn) {
         announcementDetailsBtn.addEventListener('click', async function() {
             const announcements = await getTodayAnnouncements();
-            await markVisibleAnnouncementsRead(announcements);
-            const message = announcements.map((item, index) => {
-                const attachment = item.attachmentUrl ? `\n   Ek: ${item.attachmentUrl}` : '';
-                return `${index + 1}. ${formatTickerText(item)}${attachment}`;
-            }).join('\n');
-            alert(message || 'Bugun icin aktif vardiya duyurusu bulunmuyor.');
+            await openAnnouncementModal(announcements);
         });
     }
 
@@ -439,7 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aktif arızalar
         const activeFaultsEl = document.getElementById('active-faults-value');
         if (activeFaultsEl) {
-            animateValue(activeFaultsEl, 0, summaryData.activeFaults, 1500, ' Arıza');
+            animateValue(activeFaultsEl, 0, summaryData.activeFaults, 1500, ' Duyuru');
         }
     }
 
@@ -466,10 +538,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     async function loadMaintenanceData() {
-        await Promise.allSettled([
-            loadMaintenanceTotal(),
-            loadActiveFaultCount()
-        ]);
+        await loadMaintenanceTotal();
     }
 
     async function loadMaintenanceTotal() {
@@ -529,6 +598,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function loadCachedMotorData() {
+        try {
+            const cached = JSON.parse(localStorage.getItem(MOTOR_DATA_CACHE_KEY) || '{}');
+            if (!cached || typeof cached !== 'object') return;
+
+            Object.keys(motorData).forEach(key => {
+                if (!cached[key]) return;
+                motorData[key].totalProduction = parseDashboardNumber(cached[key].totalProduction);
+                motorData[key].hourlyProduction = parseDashboardNumber(cached[key].hourlyProduction);
+                motorData[key].totalHours = parseDashboardNumber(cached[key].totalHours);
+                motorData[key].hourlyHours = parseDashboardNumber(cached[key].hourlyHours);
+                motorData[key].totalStarts = parseDashboardNumber(cached[key].totalStarts);
+                motorData[key].status = cached[key].status === 'running' ? 'running' : 'stopped';
+            });
+        } catch (error) {
+            console.error('Motor kart cache okunamadi:', error);
+        }
+    }
+
+    function cacheMotorData() {
+        const data = {};
+        Object.keys(motorData).forEach(key => {
+            data[key] = {
+                totalProduction: motorData[key].totalProduction || 0,
+                hourlyProduction: motorData[key].hourlyProduction || 0,
+                totalHours: motorData[key].totalHours || 0,
+                hourlyHours: motorData[key].hourlyHours || 0,
+                totalStarts: motorData[key].totalStarts || 0,
+                status: motorData[key].status || 'stopped'
+            };
+        });
+        localStorage.setItem(MOTOR_DATA_CACHE_KEY, JSON.stringify(data));
+    }
+
     function loadCachedSummaryValues() {
         const today = formatDashboardDateTR(new Date());
         const cachedDate = localStorage.getItem(SUMMARY_CACHE_DATE_KEY);
@@ -545,6 +648,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const value = parseDashboardNumber(cachedSteam);
             if (Number.isFinite(value)) summaryData.dailySteam = value;
         }
+    }
+
+    function loadCachedAnnouncementCount() {
+        const cached = getCachedAnnouncements();
+        summaryData.activeFaults = cached.length ? cached.length : defaultAnnouncements.length;
     }
 
     function cacheSummaryValues() {
@@ -735,6 +843,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(SUMMARY_CACHE_DATE_KEY, today);
                 updateSummaryData();
             }
+
+            cacheMotorData();
         } catch (error) {
             console.error('Son enerji verisi yuklenemedi:', error);
         }
@@ -764,6 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
             Object.entries(latestByMotor).forEach(([key, record]) => {
                 motorData[key].status = isStoppedMotorStatus(record.durum) ? 'stopped' : 'running';
             });
+            cacheMotorData();
         } catch (error) {
             console.error('Son motor durumu yuklenemedi:', error);
         }
@@ -933,20 +1044,97 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
 
-    // Motor kartlarına tıklama olayı
-    const motorCards = document.querySelectorAll('.motor-card');
-    motorCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const motorId = this.getAttribute('data-motor');
-            const motorName = this.querySelector('h3').textContent;
-            showNotification(`${motorName} detayları için sayfa yapım aşamasında.`, 'info');
+    async function openAnnouncementModal(announcements) {
+        const modal = document.getElementById('announcementModal');
+        const body = document.getElementById('announcementModalBody');
+        if (!modal || !body) return;
+
+        const items = Array.isArray(announcements) ? announcements : await getTodayAnnouncements();
+        renderAnnouncementModalItems(body, items);
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        markVisibleAnnouncementsRead(items);
+        refreshAnnouncementsFromSheets();
+    }
+
+    function closeAnnouncementModal() {
+        const modal = document.getElementById('announcementModal');
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    function renderAnnouncementModalItems(body, announcements) {
+        body.innerHTML = '';
+        if (!announcements.length) {
+            const empty = document.createElement('div');
+            empty.className = 'announcement-empty';
+            empty.textContent = 'Bugun icin aktif vardiya duyurusu bulunmuyor.';
+            body.appendChild(empty);
+            return;
+        }
+
+        const list = document.createElement('div');
+        list.className = 'announcement-list';
+        announcements.forEach(item => {
+            const row = document.createElement('article');
+            row.className = `announcement-item ${item.priority || 'normal'}`;
+
+            const meta = document.createElement('div');
+            meta.className = 'announcement-item__meta';
+            const category = formatAnnouncementCategory(item.category) || 'Vardiya';
+            meta.textContent = category;
+
+            const text = document.createElement('div');
+            text.className = 'announcement-item__text';
+            text.textContent = item.title || item.message || 'Duyuru metni yok';
+
+            row.appendChild(meta);
+            row.appendChild(text);
+
+            if (item.attachmentUrl) {
+                const attachment = document.createElement('a');
+                attachment.className = 'announcement-item__attachment';
+                attachment.href = item.attachmentUrl;
+                attachment.target = '_blank';
+                attachment.rel = 'noopener noreferrer';
+                attachment.textContent = 'Eki ac';
+                row.appendChild(attachment);
+            }
+
+            list.appendChild(row);
         });
+        body.appendChild(list);
+    }
+
+    function updateOpenAnnouncementModal(announcements) {
+        const modal = document.getElementById('announcementModal');
+        const body = document.getElementById('announcementModalBody');
+        if (!modal || !body || !modal.classList.contains('is-open')) return;
+        renderAnnouncementModalItems(body, announcements);
+    }
+
+    document.querySelectorAll('[data-close-announcements]').forEach(item => {
+        item.addEventListener('click', closeAnnouncementModal);
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeAnnouncementModal();
+        }
     });
 
     function openSummaryCard(card) {
         if (card.classList.contains('maintenance') || card.dataset.target === 'maintenance-history') {
             sessionStorage.setItem('maintenanceHistoryView', '1');
             window.location.href = 'bakim-takibi.html#detayli-bakim-gecmisi';
+            return;
+        }
+
+        if (card.dataset.target === 'announcements') {
+            openAnnouncementModal();
             return;
         }
 

@@ -669,6 +669,139 @@ body {
     box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
 }
 
+.summary-card.announcements-card {
+    cursor: pointer;
+}
+
+.summary-card.announcements-card:focus-visible {
+    outline: 3px solid #3498db;
+    outline-offset: 4px;
+}
+
+.summary-card.announcements-card .card-icon {
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.28);
+}
+
+.announcement-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10020;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.announcement-modal.is-open {
+    display: flex;
+}
+
+.announcement-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+}
+
+.announcement-modal__panel {
+    position: relative;
+    width: min(720px, 100%);
+    max-height: min(78vh, 720px);
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+    display: flex;
+    flex-direction: column;
+}
+
+.announcement-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.announcement-modal__header h2 {
+    font-size: 20px;
+    color: #1f2937;
+    font-weight: 700;
+}
+
+.announcement-modal__close {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.announcement-modal__body {
+    padding: 18px 24px 24px;
+    overflow-y: auto;
+}
+
+.announcement-list {
+    display: grid;
+    gap: 12px;
+}
+
+.announcement-item {
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid #2563eb;
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: #ffffff;
+}
+
+.announcement-item.high {
+    border-left-color: #dc2626;
+}
+
+.announcement-item.medium {
+    border-left-color: #d97706;
+}
+
+.announcement-item__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.announcement-item__text {
+    color: #1f2937;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.announcement-item__attachment {
+    display: inline-block;
+    margin-top: 10px;
+    color: #2563eb;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.announcement-empty {
+    color: #6b7280;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 16px 0;
+}
+
 /* Çıkış Butonu */
 .header .logout-btn {
     padding: 10px 20px;
