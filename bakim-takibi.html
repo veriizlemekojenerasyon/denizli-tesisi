@@ -641,7 +641,7 @@
                                     </div>
                                 </div>
                                 
-                                <div class="report-table-container">
+                                <div class="report-table-container" id="detayli-bakim-gecmisi">
                                     <h3>📄 Detaylı Bakım Geçmişi</h3>
                                     <div class="table-controls">
                                         <input type="text" id="table-search" placeholder="Ara..." style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
@@ -744,6 +744,12 @@
             if (!logged) { window.location.href = 'anasayfa.html'; return; }
             try {
                 const user = JSON.parse(logged);
+                const isHistoryView = window.location.hash === '#detayli-bakim-gecmisi';
+                const hasHistoryAccess = sessionStorage.getItem('maintenanceHistoryView') === '1';
+                if (user.role !== 'admin' && isHistoryView && hasHistoryAccess) {
+                    document.body.classList.add('operator-history-view');
+                    user.role = 'admin';
+                }
                 if (user.role !== 'admin') {
                     alert('Bu sayfaya erişim yetkiniz yok!');
                     window.location.href = 'anasayfa.html';

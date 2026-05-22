@@ -823,3 +823,28 @@ textarea:focus {
     width: 100%;
   }
 }
+
+body.operator-history-view .top-dashboard-row,
+body.operator-history-view .forms-section,
+body.operator-history-view .report-panel > h2,
+body.operator-history-view .report-controls,
+body.operator-history-view .report-summary,
+body.operator-history-view .active-records-panel {
+  display: none !important;
+}
+
+body.operator-history-view .main-content-area {
+  display: block !important;
+}
+
+body.operator-history-view .reports-section,
+body.operator-history-view .report-panel,
+body.operator-history-view .report-results,
+body.operator-history-view .report-table-container {
+  width: 100%;
+  max-width: none;
+}
+
+body.operator-history-view .report-table-container {
+  margin-top: 0;
+}

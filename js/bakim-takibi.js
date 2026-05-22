@@ -2,6 +2,10 @@
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxsBZXOv_KJZM4KJ8MTqBa7YRzt4GoAOLNPdpVYb59JmzfRKbVRVjUzvBvxWiH47W2q/exec";
 const selectedMaintenanceFiles = { periodic: [], normal: [], fault: [] };
 
+function isOperatorHistoryOnlyView() {
+    return document.body.classList.contains('operator-history-view');
+}
+
 // Sistem başlatma fonksiyonu
 async function initializeSystem() {
     try {
@@ -1064,8 +1068,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sayfa yuklendiginde tarihleri ayarla
     setAutoDate();
     
-    // Grafik butonlarini ayarla
-    setupChartButtons();
+    if (!isOperatorHistoryOnlyView()) {
+        // Grafik butonlarini ayarla
+        setupChartButtons();
+    }
     
     // Arama fonksiyonunu ayarla
     setupSearchFunction();
@@ -1074,29 +1080,41 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Sistem otomatik baslatiliyor...');
     initializeSystem();
     
-    // Istatistikleri yukle (sistem baslatildiktan sonra)
-    setTimeout(() => {
-        console.log('Istatistikler otomatik yukleniyor...');
-        maintenanceStats.loadStats();
-    }, 1000);
+    if (!isOperatorHistoryOnlyView()) {
+        // Istatistikleri yukle (sistem baslatildiktan sonra)
+        setTimeout(() => {
+            console.log('Istatistikler otomatik yukleniyor...');
+            maintenanceStats.loadStats();
+        }, 1000);
+    }
 
-    setTimeout(() => {
-        loadActiveRecords();
-    }, 1500);
+    if (!isOperatorHistoryOnlyView()) {
+        setTimeout(() => {
+            loadActiveRecords();
+        }, 1500);
+    }
     
-    // Bakim hatiraticilarini kontrol et
-    setTimeout(() => {
-        checkMaintenanceReminders();
-    }, 3000);
+    if (!isOperatorHistoryOnlyView()) {
+        // Bakim hatiraticilarini kontrol et
+        setTimeout(() => {
+            checkMaintenanceReminders();
+        }, 3000);
+    }
 
-    setTimeout(() => {
-        checkPeriodicMaintenance();
-    }, 3500);
+    if (!isOperatorHistoryOnlyView()) {
+        setTimeout(() => {
+            checkPeriodicMaintenance();
+        }, 3500);
+    }
+
+    openDetailedMaintenanceHistoryFromHash();
     
-    // Yag numune kontrolunu baslat
-    setTimeout(() => {
-        checkOilSamples();
-    }, 4000)
+    if (!isOperatorHistoryOnlyView()) {
+        // Yag numune kontrolunu baslat
+        setTimeout(() => {
+            checkOilSamples();
+        }, 4000)
+    }
     
     // Form submit olaylarını güncelle
     document.querySelector('#periodic-form form')?.addEventListener('submit', (e) => {
@@ -1770,8 +1788,30 @@ function sortTable(columnIndex) {
     maintenanceReporter.sortTable(columnIndex);
 }
 
+function openDetailedMaintenanceHistoryFromHash() {
+    if (window.location.hash !== '#detayli-bakim-gecmisi') return;
+
+    const dateRange = document.getElementById('report-date-range');
+    if (dateRange && !dateRange.value) {
+        dateRange.value = 'all';
+    }
+
+    setTimeout(() => {
+        const historyTable = document.getElementById('detayli-bakim-gecmisi');
+        if (historyTable) {
+            historyTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        if (maintenanceReporter) {
+            maintenanceReporter.generateReport();
+        }
+    }, 500);
+}
+
 // Aktif Kayıtlar Yönetimi - Listeleme ve Kapatma
 async function loadActiveRecords() {
+    if (isOperatorHistoryOnlyView()) return;
+
     const motor = document.getElementById('active-filter-motor')?.value || '';
     const type = normalizeMaintenanceTypeParam(document.getElementById('active-filter-type')?.value || '');
     

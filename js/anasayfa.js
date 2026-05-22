@@ -801,12 +801,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    function openSummaryCard(card) {
+        if (card.classList.contains('maintenance') || card.dataset.target === 'maintenance-history') {
+            sessionStorage.setItem('maintenanceHistoryView', '1');
+            window.location.href = 'bakim-takibi.html#detayli-bakim-gecmisi';
+            return;
+        }
+
+        const cardTitle = card.querySelector('h3').textContent;
+        showNotification(`${cardTitle} detayları için sayfa yapım aşamasında.`, 'info');
+    }
+
     // Özet kartlarına tıklama olayı
     const summaryCards = document.querySelectorAll('.summary-card');
     summaryCards.forEach(card => {
         card.addEventListener('click', function() {
-            const cardTitle = this.querySelector('h3').textContent;
-            showNotification(`${cardTitle} detayları için sayfa yapım aşamasında.`, 'info');
+            openSummaryCard(this);
+        });
+
+        card.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openSummaryCard(this);
+            }
         });
     });
 

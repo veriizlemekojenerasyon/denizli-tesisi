@@ -585,6 +585,15 @@ body {
     overflow: hidden;
 }
 
+.summary-card.maintenance {
+    cursor: pointer;
+}
+
+.summary-card.maintenance:focus-visible {
+    outline: 3px solid #3498db;
+    outline-offset: 4px;
+}
+
 .summary-card::before {
     content: '';
     position: absolute;
