@@ -339,6 +339,12 @@
     border-bottom: 1px solid #eee;
 }
 
+.maintenance-description-cell {
+    max-width: 360px;
+    white-space: normal;
+    line-height: 1.45;
+}
+
 .maintenance-table tbody tr:hover {
     background: #f8f9fa;
 }
@@ -2317,6 +2323,12 @@ body.operator-history-view .report-table-container {
     color: #111827 !important;
     border-bottom: 1px solid #e5e7eb !important;
     padding: 11px 12px !important;
+}
+
+.maintenance-description-cell {
+    max-width: 360px;
+    white-space: normal;
+    line-height: 1.45;
 }
 
 .maintenance-table tbody tr:hover,

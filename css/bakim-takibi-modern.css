@@ -723,6 +723,12 @@ textarea:focus {
   line-height: 1.25;
 }
 
+.maintenance-description-cell {
+  max-width: 360px;
+  white-space: normal;
+  line-height: 1.45;
+}
+
 .report-table-container,
 .active-records-panel {
   margin-top: 16px !important;

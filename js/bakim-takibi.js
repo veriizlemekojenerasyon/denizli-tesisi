@@ -1,5 +1,5 @@
 // Bakım Takibi JavaScript - ÇALIŞAN VERSİYON
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxsBZXOv_KJZM4KJ8MTqBa7YRzt4GoAOLNPdpVYb59JmzfRKbVRVjUzvBvxWiH47W2q/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzB09G_LlUn_XL_oQEV6uoYIPfJH-Pa1UW5utsvuZpqBFoiSEFOwkuyU2IzV4xYGgjE/exec";
 const selectedMaintenanceFiles = { periodic: [], normal: [], fault: [] };
 
 function isOperatorHistoryOnlyView() {
@@ -1547,6 +1547,15 @@ function getMaintenanceTypeDisplay(value) {
     return { label: 'Normal', badge: 'normal' };
 }
 
+function escapeTableText(value) {
+    return String(value || '-')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 class MaintenanceReporter {
     constructor() {
         this.records = [];
@@ -1625,7 +1634,7 @@ class MaintenanceReporter {
         this.populateTable([]);
     }
 
-    // Tabloyu doldur - 5 sütun: tarih, motor, tür, teknisyen, işlem
+    // Tabloyu doldur - 6 sütun: tarih, motor, tür, teknisyen, işlem, açıklama
     populateTable(records) {
         const tbody = document.getElementById('maintenance-tbody');
         if (!tbody) return;
@@ -1633,7 +1642,7 @@ class MaintenanceReporter {
         tbody.innerHTML = '';
         
         if (records.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="no-data">Henüz kayıt bulunmamaktadır</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">Henüz kayıt bulunmamaktadır</td></tr>';
             return;
         }
         
@@ -1652,13 +1661,16 @@ class MaintenanceReporter {
             
             // Motor adını büyük harfe çevir
             const motorStr = (record.motor || '-').toString().toUpperCase();
+            const operationText = record.subtype || '-';
+            const descriptionText = record.notes || '-';
             
             tr.innerHTML = `
-                <td>${dateStr}</td>
-                <td>${motorStr}</td>
+                <td>${escapeTableText(dateStr)}</td>
+                <td>${escapeTableText(motorStr)}</td>
                 <td><span class="badge badge-${typeDisplay.badge}">${typeDisplay.label}</span></td>
-                <td>${record.technician || '-'}</td>
-                <td>${record.subtype || record.notes || '-'}</td>
+                <td>${escapeTableText(record.technician || '-')}</td>
+                <td>${escapeTableText(operationText)}</td>
+                <td class="maintenance-description-cell">${escapeTableText(descriptionText)}</td>
             `;
             tbody.appendChild(tr);
         });

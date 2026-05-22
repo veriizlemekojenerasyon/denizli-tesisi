@@ -793,21 +793,22 @@ function getDashboardSummary(tarih) {
 
 function createEmptyDashboardMotors() {
   return {
-    gm1: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' },
-    gm2: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' },
-    gm3: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, status: 'stopped' }
+    gm1: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, totalStarts: 0, status: 'stopped' },
+    gm2: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, totalStarts: 0, status: 'stopped' },
+    gm3: { totalProduction: 0, hourlyProduction: 0, totalHours: 0, hourlyHours: 0, totalStarts: 0, status: 'stopped' }
   };
 }
 
 function getDashboardDailyProductionMwh(tarih) {
   var motors = ['GM-1', 'GM-2', 'GM-3'];
   var totalMwh = 0;
+  var targetStart = parseDateTimeTR(tarih, '00:00').getTime();
 
   for (var i = 0; i < motors.length; i++) {
     var sheet = getEnerjiSheetIfExists(motors[i]);
     if (!sheet || sheet.getLastRow() < 2) continue;
 
-    var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 18).getDisplayValues();
+    var rows = getDashboardRecentRowsForDate(sheet, tarih, targetStart);
     var records = [];
     for (var j = 0; j < rows.length; j++) {
       var record = mapEnerjiRow(rows[j]);
@@ -834,6 +835,43 @@ function getDashboardDailyProductionMwh(tarih) {
   }
 
   return totalMwh;
+}
+
+function getDashboardRecentRowsForDate(sheet, tarih, targetStart) {
+  var rows = [];
+  var chunkSize = 120;
+  var firstDataRow = 2;
+  var cursor = sheet.getLastRow();
+  var foundTargetDate = false;
+
+  while (cursor >= firstDataRow) {
+    var startRow = Math.max(firstDataRow, cursor - chunkSize + 1);
+    var rowCount = cursor - startRow + 1;
+    var chunk = sheet.getRange(startRow, 1, rowCount, 18).getDisplayValues();
+
+    for (var i = chunk.length - 1; i >= 0; i--) {
+      var rowDate = String(chunk[i][0] || '').trim();
+      if (rowDate === tarih) {
+        rows.push(chunk[i]);
+        foundTargetDate = true;
+        continue;
+      }
+
+      if (foundTargetDate) {
+        var rowTime = parseDateTimeTR(rowDate, '00:00').getTime();
+        if (!isNaN(rowTime) && rowTime < targetStart) {
+          return rows;
+        }
+      }
+    }
+
+    cursor = startRow - 1;
+    if (foundTargetDate && rows.length >= 24) {
+      break;
+    }
+  }
+
+  return rows;
 }
 
 function getDashboardMotorKey(value) {
@@ -888,14 +926,16 @@ function applyLatestEnergyToDashboard(motorData, records) {
 
     var totalEnergy = parseEnerjiNumber(record.toplamAktifEnerji);
     var totalHours = parseEnerjiNumber(record.calismaSaati);
+    var totalStarts = parseEnerjiNumber(record.kalkisSayisi);
     var previousRecord = recordsByMotor[key] && recordsByMotor[key].length > 1 ? recordsByMotor[key][1] : null;
     var previousEnergy = previousRecord ? parseEnerjiNumber(previousRecord.toplamAktifEnerji) : totalEnergy;
     var previousHours = previousRecord ? parseEnerjiNumber(previousRecord.calismaSaati) : totalHours;
 
-    motorData[key].totalProduction = totalEnergy / 1000;
-    motorData[key].hourlyProduction = Math.max(0, (totalEnergy - previousEnergy) / 1000);
+    motorData[key].totalProduction = totalEnergy;
+    motorData[key].hourlyProduction = Math.max(0, totalEnergy - previousEnergy);
     motorData[key].totalHours = totalHours;
     motorData[key].hourlyHours = Math.max(0, totalHours - previousHours);
+    motorData[key].totalStarts = totalStarts;
     if (isDashboardStoppedStatus(record.durum)) {
       motorData[key].status = 'stopped';
     }

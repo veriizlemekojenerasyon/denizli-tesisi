@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hourlyProduction: 0,
             totalHours: 0,
             hourlyHours: 0,
+            totalStarts: 0,
             status: 'stopped'
         },
         gm2: {
@@ -16,6 +17,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hourlyProduction: 0,
             totalHours: 0,
             hourlyHours: 0,
+            totalStarts: 0,
             status: 'stopped'
         },
         gm3: {
@@ -23,6 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
             hourlyProduction: 0,
             totalHours: 0,
             hourlyHours: 0,
+            totalStarts: 0,
             status: 'stopped'
         }
     };
@@ -31,15 +34,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const summaryData = {
         dailyProduction: 0,
         dailySteam: null, // Buhar verisinden çekilecek
-        pendingMaintenance: 3,
+        pendingMaintenance: 0,
         activeFaults: 1
     };
 
     // Buhar verisi config
     const BUHAR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwSmfP2MQ5hz3rlWUXcr46zFLc8zZx9gQ8Onh0xZCSVWfkXbDFrh3ufPuMzk2WHoF7P/exec';
-    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxysc_Z4VtE1Weohc91XcOi651EwxrPlanIOyebKfSJyBEUQJ2lvf6hP-fkS1OKqyk/exec';
+    const KOJEN_ENERJI_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwlotG6AdPrPbf69w8X8JoS6kg1hoR17RurW3UG0R9P0DYJ1y8Dgxwtjxe3kpc0FNFT/exec';
     const KOJEN_MOTOR_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec';
-    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxsBZXOv_KJZM4KJ8MTqBa7YRzt4GoAOLNPdpVYb59JmzfRKbVRVjUzvBvxWiH47W2q/exec';
+    const BAKIM_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzB09G_LlUn_XL_oQEV6uoYIPfJH-Pa1UW5utsvuZpqBFoiSEFOwkuyU2IzV4xYGgjE/exec';
     const SAATLIK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzpkF4RJJ46d9A9518oxSwGaeuSgw-VHodQ5hjCApqb1H0FuIEnYNsqGOSdWXf9Yc/exec';
     const GUNLUK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwNka_9UemxV0HPBVA02qUE2ayzICY4OH0Ms3uBx4VupMB-4UZlnvNhCoeV6SRzkAFy/exec';
     const ADMIN_TRIGGER_MODULES = [
@@ -50,6 +53,10 @@ document.addEventListener('DOMContentLoaded', function() {
         { key: 'gunluk', label: 'Gunluk Veri', url: GUNLUK_APPS_SCRIPT_URL }
     ];
     const ANNOUNCEMENTS_STORAGE_KEY = 'shiftAnnouncements';
+    const MAINTENANCE_TOTAL_CACHE_KEY = 'dashboardMaintenanceTotal';
+    const DAILY_PRODUCTION_CACHE_KEY = 'dashboardDailyProduction';
+    const DAILY_STEAM_CACHE_KEY = 'dashboardDailySteam';
+    const SUMMARY_CACHE_DATE_KEY = 'dashboardSummaryCacheDate';
     const defaultAnnouncements = [
         {
             title: '08-16 vardiyasi: kojenerasyon saha kontrol listesi tamamlanacak',
@@ -65,23 +72,33 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     ];
     let dashboardAnnouncements = null;
+    loadCachedMaintenanceTotal();
+    loadCachedSummaryValues();
 
-    // Sayfa yüklendiğinde verileri göster
-    setTimeout(loadDashboardData, 1000);
+    // Sayfa yuklendiginde verileri bekletmeden goster
+    loadDashboardData();
     setInterval(loadDashboardData, 5 * 60 * 1000);
     setTimeout(ensureAdminTriggersAfterLogin, 1800);
 
     async function loadDashboardData() {
-        const dashboardLoaded = await loadDashboardSummary();
-        await updateAnnouncementTicker();
-        await loadLatestEnergyData();
-        await loadLatestMotorStatus();
-        await loadMaintenanceData();
-        if (!dashboardLoaded) {
-            await loadBuharData();
-        }
         updateMotorData();
         updateSummaryData();
+
+        const dashboardTask = loadDashboardSummary().then(async dashboardLoaded => {
+            updateMotorData();
+            updateSummaryData();
+        });
+
+        const tasks = [
+            dashboardTask,
+            updateAnnouncementTicker(),
+            loadBuharData().then(updateSummaryData),
+            loadLatestEnergyData().then(updateMotorData),
+            loadLatestMotorStatus().then(updateMotorData),
+            loadMaintenanceData().then(updateSummaryData)
+        ];
+
+        await Promise.allSettled(tasks);
     }
 
     // Motor verilerini güncelle
@@ -142,8 +159,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 summaryData.dailySteam = result.summary.dailySteam === null || result.summary.dailySteam === undefined
                     ? null
                     : parseDashboardNumber(result.summary.dailySteam);
-                summaryData.pendingMaintenance = parseDashboardNumber(result.summary.pendingMaintenance);
                 summaryData.activeFaults = parseDashboardNumber(result.summary.activeFaults);
+                cacheSummaryValues();
             }
 
             if (result.motors) {
@@ -153,6 +170,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     motorData[key].hourlyProduction = parseDashboardNumber(data.hourlyProduction);
                     motorData[key].totalHours = parseDashboardNumber(data.totalHours);
                     motorData[key].hourlyHours = parseDashboardNumber(data.hourlyHours);
+                    if (data.totalStarts !== undefined && data.totalStarts !== null && data.totalStarts !== '') {
+                        motorData[key].totalStarts = parseDashboardNumber(data.totalStarts);
+                    }
                     motorData[key].status = data.status === 'running' ? 'running' : 'stopped';
                 });
             }
@@ -361,23 +381,28 @@ document.addEventListener('DOMContentLoaded', function() {
             // Toplam üretim
             const totalProductionEl = document.getElementById(`${motorId}-total-production`);
             if (totalProductionEl) {
-                animateValue(totalProductionEl, 0, data.totalProduction, 1500, ' MWh');
+                animateValue(totalProductionEl, 0, data.totalProduction, 1500, ' MWh', 1);
             }
 
             const hourlyProductionEl = document.getElementById(`${motorId}-hourly-production`);
             if (hourlyProductionEl) {
-                animateValue(hourlyProductionEl, 0, data.hourlyProduction || 0, 1500, ' MWh');
+                animateValue(hourlyProductionEl, 0, data.hourlyProduction || 0, 1500, ' MWh', 1);
             }
 
             // Toplam çalışma
             const totalHoursEl = document.getElementById(`${motorId}-total-hours`);
             if (totalHoursEl) {
-                animateValue(totalHoursEl, 0, data.totalHours, 1500, ' saat');
+                animateValue(totalHoursEl, 0, data.totalHours, 1500, ' saat', 1);
             }
 
             const hourlyHoursEl = document.getElementById(`${motorId}-hourly-hours`);
             if (hourlyHoursEl) {
-                animateValue(hourlyHoursEl, 0, data.hourlyHours || 0, 1500, ' saat');
+                animateValue(hourlyHoursEl, 0, data.hourlyHours || 0, 1500, ' saat', 1);
+            }
+
+            const totalStartsEl = document.getElementById(`${motorId}-total-starts`);
+            if (totalStartsEl) {
+                animateValue(totalStartsEl, 0, data.totalStarts || 0, 1500, ' adet');
             }
 
             // Motor durumunu güncelle
@@ -396,7 +421,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateSummaryData() {
         const dailyProductionEl = document.getElementById('daily-production-value');
         if (dailyProductionEl) {
-            animateValue(dailyProductionEl, 0, summaryData.dailyProduction, 1500, ' MWh');
+            animateValue(dailyProductionEl, 0, summaryData.dailyProduction, 1500, ' MWh', 1);
         }
 
         // Günlük buhar
@@ -405,10 +430,10 @@ document.addEventListener('DOMContentLoaded', function() {
             dailySteamEl.textContent = summaryData.dailySteam.toFixed(2) + ' Ton';
         }
 
-        // Bekleyen bakım
+        // Toplam bakım formu
         const pendingMaintenanceEl = document.getElementById('pending-maintenance-value');
         if (pendingMaintenanceEl) {
-            animateValue(pendingMaintenanceEl, 0, summaryData.pendingMaintenance, 1500, ' İş Emri');
+            animateValue(pendingMaintenanceEl, 0, summaryData.pendingMaintenance, 1500, ' Form');
         }
 
         // Aktif arızalar
@@ -431,6 +456,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (result.success && result.data && result.data.length > 0) {
                 const lastRecord = result.data[0];
                 summaryData.dailySteam = parseFloat(lastRecord.buharMiktari) || 0;
+                localStorage.setItem(DAILY_STEAM_CACHE_KEY, String(summaryData.dailySteam));
+                localStorage.setItem(SUMMARY_CACHE_DATE_KEY, formatDashboardDateTR(new Date()));
             } else {
                 summaryData.dailySteam = null;
             }
@@ -439,15 +466,43 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     async function loadMaintenanceData() {
+        await Promise.allSettled([
+            loadMaintenanceTotal(),
+            loadActiveFaultCount()
+        ]);
+    }
+
+    async function loadMaintenanceTotal() {
+        try {
+            const url = new URL(BAKIM_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'getReport');
+            url.searchParams.append('range', 'all');
+
+            const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+            const result = await response.json();
+
+            if (result.success && result.summary) {
+                summaryData.pendingMaintenance = parseDashboardNumber(result.summary.total);
+                localStorage.setItem(MAINTENANCE_TOTAL_CACHE_KEY, String(summaryData.pendingMaintenance));
+                updateSummaryData();
+            } else {
+                console.error('Toplam bakim form adedi alinamadi:', result.message || result.error);
+            }
+        } catch (error) {
+            console.error('Toplam bakim form adedi yuklenemedi:', error);
+        }
+    }
+
+    async function loadActiveFaultCount() {
         try {
             const url = new URL(BAKIM_APPS_SCRIPT_URL);
             url.searchParams.append('action', 'getActiveRecords');
 
-            const response = await fetch(url, { method: 'GET', mode: 'cors' });
+            const response = await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-cache' });
             const result = await response.json();
 
             if (!result.success || !Array.isArray(result.records)) {
-                console.error('Bekleyen bakim verisi alinamadi:', result.message || result.error);
+                console.error('Aktif ariza verisi alinamadi:', result.message || result.error);
                 return;
             }
 
@@ -455,15 +510,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 return String(record.status || '').toLowerCase() === 'aktif';
             });
 
-            summaryData.pendingMaintenance = activeRecords.filter(record => {
-                return !isFaultRecordType(record.type);
-            }).length;
-
             summaryData.activeFaults = activeRecords.filter(record => {
                 return isFaultRecordType(record.type);
             }).length;
+            updateSummaryData();
         } catch (error) {
-            console.error('Bekleyen bakim verisi yuklenemedi:', error);
+            console.error('Aktif ariza verisi yuklenemedi:', error);
+        }
+    }
+
+    function loadCachedMaintenanceTotal() {
+        const cached = localStorage.getItem(MAINTENANCE_TOTAL_CACHE_KEY);
+        if (cached === null) return;
+
+        const total = parseDashboardNumber(cached);
+        if (Number.isFinite(total)) {
+            summaryData.pendingMaintenance = total;
+        }
+    }
+
+    function loadCachedSummaryValues() {
+        const today = formatDashboardDateTR(new Date());
+        const cachedDate = localStorage.getItem(SUMMARY_CACHE_DATE_KEY);
+        if (cachedDate !== today) return;
+
+        const cachedProduction = localStorage.getItem(DAILY_PRODUCTION_CACHE_KEY);
+        if (cachedProduction !== null) {
+            const value = parseDashboardNumber(cachedProduction);
+            if (Number.isFinite(value)) summaryData.dailyProduction = value;
+        }
+
+        const cachedSteam = localStorage.getItem(DAILY_STEAM_CACHE_KEY);
+        if (cachedSteam !== null) {
+            const value = parseDashboardNumber(cachedSteam);
+            if (Number.isFinite(value)) summaryData.dailySteam = value;
+        }
+    }
+
+    function cacheSummaryValues() {
+        localStorage.setItem(SUMMARY_CACHE_DATE_KEY, formatDashboardDateTR(new Date()));
+        localStorage.setItem(DAILY_PRODUCTION_CACHE_KEY, String(summaryData.dailyProduction));
+        if (summaryData.dailySteam !== null) {
+            localStorage.setItem(DAILY_STEAM_CACHE_KEY, String(summaryData.dailySteam));
         }
     }
 
@@ -561,6 +649,19 @@ document.addEventListener('DOMContentLoaded', function() {
         return Math.max(0, lastHours - firstHours);
     }
 
+    function calculateDailyMotorProduction(records, tarih) {
+        const todayRecords = (records || [])
+            .filter(record => normalizeDashboardDate(record.tarih) === tarih)
+            .slice()
+            .sort((a, b) => normalizeDashboardHour(a.saat).localeCompare(normalizeDashboardHour(b.saat)));
+
+        if (todayRecords.length < 2) return null;
+
+        const firstEnergy = parseDashboardNumber(todayRecords[0].toplamAktifEnerji);
+        const lastEnergy = parseDashboardNumber(todayRecords[todayRecords.length - 1].toplamAktifEnerji);
+        return Math.max(0, lastEnergy - firstEnergy);
+    }
+
     function isStoppedMotorStatus(value) {
         const status = normalizeText(value);
         const originalStatus = String(value || '').toLowerCase();
@@ -601,23 +702,39 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const today = formatDashboardDateTR(new Date());
+            let dailyProductionTotal = 0;
+            let dailyProductionMotorCount = 0;
 
             Object.entries(latestByMotor).forEach(([key, record]) => {
                 const totalEnergyKwh = parseDashboardNumber(record.toplamAktifEnerji);
                 const totalHours = parseDashboardNumber(record.calismaSaati);
+                const totalStarts = parseDashboardNumber(record.kalkisSayisi);
                 const previousRecord = recordsByMotor[key] && recordsByMotor[key][1] ? recordsByMotor[key][1] : null;
                 const previousEnergyKwh = previousRecord ? parseDashboardNumber(previousRecord.toplamAktifEnerji) : totalEnergyKwh;
                 const dailyHours = calculateDailyMotorHours(recordsByMotor[key], today);
+                const dailyProduction = calculateDailyMotorProduction(recordsByMotor[key], today);
 
-                motorData[key].totalProduction = totalEnergyKwh / 1000;
-                motorData[key].hourlyProduction = Math.max(0, (totalEnergyKwh - previousEnergyKwh) / 1000);
+                motorData[key].totalProduction = totalEnergyKwh;
+                motorData[key].hourlyProduction = Math.max(0, totalEnergyKwh - previousEnergyKwh);
                 motorData[key].totalHours = totalHours;
                 motorData[key].hourlyHours = dailyHours === null ? 0 : dailyHours;
+                motorData[key].totalStarts = totalStarts;
+                if (dailyProduction !== null) {
+                    dailyProductionTotal += dailyProduction;
+                    dailyProductionMotorCount++;
+                }
 
                 if (isStoppedMotorStatus(record.durum)) {
                     motorData[key].status = 'stopped';
                 }
             });
+
+            if (dailyProductionMotorCount > 0) {
+                summaryData.dailyProduction = dailyProductionTotal;
+                localStorage.setItem(DAILY_PRODUCTION_CACHE_KEY, String(summaryData.dailyProduction));
+                localStorage.setItem(SUMMARY_CACHE_DATE_KEY, today);
+                updateSummaryData();
+            }
         } catch (error) {
             console.error('Son enerji verisi yuklenemedi:', error);
         }
@@ -653,7 +770,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Sayısal değer animasyonu
-    function animateValue(element, start, end, duration, suffix = '') {
+    function formatDashboardNumber(value, decimals = null) {
+        if (decimals !== null && decimals !== undefined) {
+            return Number(value || 0).toLocaleString('tr-TR', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals,
+                useGrouping: false
+            });
+        }
+
+        return Number(value || 0).toLocaleString('tr-TR', {
+            maximumFractionDigits: value % 1 !== 0 ? 1 : 0,
+            useGrouping: false
+        });
+    }
+
+    function animateValue(element, start, end, duration, suffix = '', decimals = null) {
+        const currentText = String(element.textContent || '').replace(',', '.');
+        const currentNumber = parseFloat(currentText);
+        if (Number.isFinite(currentNumber)) {
+            start = currentNumber;
+        }
+
+        duration = Math.min(duration || 500, 500);
+        if (element._animationFrame) {
+            cancelAnimationFrame(element._animationFrame);
+        }
+
         const startTime = performance.now();
         const isFloat = end % 1 !== 0;
 
@@ -666,18 +809,17 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const currentValue = start + (end - start) * easeOutQuart;
             
-            if (isFloat) {
-                element.textContent = currentValue.toFixed(1) + suffix;
-            } else {
-                element.textContent = Math.round(currentValue) + suffix;
-            }
+            element.textContent = formatDashboardNumber(
+                decimals !== null && decimals !== undefined ? currentValue : (isFloat ? currentValue : Math.round(currentValue)),
+                decimals
+            ) + suffix;
 
             if (progress < 1) {
-                requestAnimationFrame(update);
+                element._animationFrame = requestAnimationFrame(update);
             }
         }
 
-        requestAnimationFrame(update);
+        element._animationFrame = requestAnimationFrame(update);
     }
 
     // Çıkış yap butonları
