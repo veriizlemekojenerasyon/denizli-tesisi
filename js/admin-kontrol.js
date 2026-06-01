@@ -5,7 +5,7 @@
     buhar: 'https://script.google.com/macros/s/AKfycbzfyTZBsaswmpE2n-pWQScgnQW3EIqy8oteTXurwK5umzyvGR9YGN30w-XQYqzgyKAG/exec',
     gunluk: 'https://script.google.com/macros/s/AKfycbxWz5Ea81m_kJ8TybTaowHlNqdAZeK2dQ70pJWPDTVm_ooAwnnO6nOlN5ZBIPnZLRmK/exec',
     bakim: 'https://script.google.com/macros/s/AKfycbzWkOZ3Z4TTuj7frYqjgYnsUZwKxNsO38hZv_q92aTeIHW6Zv1aBFNsmcwA-wxCR9NX/exec',
-    vardiya: 'https://script.google.com/macros/s/AKfycby4xRMYihfe_73NI-wMCvioTG6PrZilWAIBdA0n7dbJl6Nq9oJ-Va6IL-60_9OMNX3P/exec',
+    vardiya: 'https://script.google.com/macros/s/AKfycbygGjbmXyFU7jzsWpZS8DlyB6JDFTB8KG89wqNoh6Ha5g4bLun5krcgYGkaAEJq2IBV/exec',
     bildirim: 'https://script.google.com/macros/s/AKfycbz9uR24xQeuV85ygxfFiakRRJz601KgaKCgOlHcsuYDjUl5xkR4o3HbIVn-tgVdSnTF/exec'
 };
 

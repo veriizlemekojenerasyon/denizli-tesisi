@@ -216,6 +216,19 @@
                             </div>
                         </div>
                         <!-- İşlem Kaydetme -->
+                    <div class="temizlik-checklist" id="temizlikChecklist" style="display: none;">
+                        <div class="temizlik-checklist-header">
+                            <div>
+                                <h3 class="subsection-title">Vardiya Temizlik Kontrolu</h3>
+                                <p id="temizlikChecklistMeta">Bu vardiya icin planlanan temizlik alanlari</p>
+                            </div>
+                            <span class="temizlik-status" id="temizlikSaveStatus">Bekliyor</span>
+                        </div>
+                        <div class="temizlik-gorevleri" id="temizlikGorevleri">
+                            <!-- Temizlik gorevleri JavaScript ile doldurulacak -->
+                        </div>
+                    </div>
+
                     <div class="islem-kaydetme">
                         <h3 class="subsection-title">Vardiya İşlem Kaydetme</h3>
                         <div class="form-group full-width">
@@ -254,6 +267,38 @@
                     </div>
 
                     <!-- Haftalık Vardiya Kayıtları -->
+                    <div class="temizlik-aylik-listesi">
+                        <div class="temizlik-aylik-header">
+                            <div>
+                                <h3 class="subsection-title">Aylik Temizlik Listesi</h3>
+                                <p>Google Sheets tarafinda ay bazli TemizlikListesi sayfasi olusturulur.</p>
+                            </div>
+                            <div class="temizlik-aylik-controls">
+                                <input type="month" id="temizlikAySecimi" name="temizlikAySecimi">
+                                <button type="button" class="submit-btn" id="temizlikAyYukleBtn">LISTEYI YUKLE</button>
+                            </div>
+                        </div>
+                        <div class="temizlik-summary" id="temizlikAylikOzet">Liste yuklenmedi.</div>
+                        <div class="table-container">
+                            <table class="temizlik-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tarih</th>
+                                        <th>Vardiya</th>
+                                        <th>Rol</th>
+                                        <th>Alan</th>
+                                        <th>Sorumlu</th>
+                                        <th>Durum</th>
+                                        <th>Zaman</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="temizlikAylikTableBody">
+                                    <!-- Aylik temizlik listesi JavaScript ile doldurulacak -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div class="haftalik-vardiya-kayitlari">
                         <h3 class="subsection-title">Haftalık Vardiya Kayıtları</h3>
                         

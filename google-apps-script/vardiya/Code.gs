@@ -58,6 +58,15 @@ function handleRequest(e) {
       case 'getIslemlerByVardiyaId':
         result = getIslemlerByVardiyaId(e.parameter.vardiyaId);
         break;
+      case 'getMonthlyCleaningList':
+        result = getMonthlyCleaningList(e.parameter.year, e.parameter.month);
+        break;
+      case 'saveCleaningChecklist':
+        result = saveCleaningChecklist(e.parameter);
+        break;
+      case 'getCleaningChecklist':
+        result = getCleaningChecklist(e.parameter);
+        break;
       default:
         result = { success: false, error: 'Geçersiz işlem' };
     }
@@ -526,6 +535,10 @@ function formatDateTimeTR(date) {
 // Yeni işlem kaydı ekle
 function addIslem(data) {
   try {
+    if (!String(data.islem || '').trim()) {
+      return { success: false, error: 'Islem aciklamasi eksik' };
+    }
+
     var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = spreadsheet.getSheetByName('VardiyaIslemleri');
     
@@ -701,6 +714,311 @@ function getLastRecordsWithIslemler(count) {
     
     return { success: true, data: vardiyaKayitlari };
     
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getCleaningTaskDefinitions() {
+  return [
+    { vardiya: '08-16', role: 'Ana Vardiya', area: 'Tuvalet/Banyo, Soyunma Odasi ve Mutfak', sort: 1 },
+    { vardiya: '08-16', role: 'Yardimci Vardiya', area: 'Hucre Odasi ve Merdivenleri', sort: 2, helperOnly: true },
+    { vardiya: '16-24', role: 'Ana Vardiya', area: 'Kontrol Odasi ve Koridor', sort: 4 },
+    { vardiya: '24-08', role: 'Ana Vardiya', area: 'Motor Dairesi', sort: 5 }
+  ];
+}
+
+function getCleaningSheetName(year, month) {
+  return 'TemizlikListesi-' + year + '-' + String(month).padStart(2, '0');
+}
+
+function ensureCleaningSheet(year, month) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = getCleaningSheetName(year, month);
+  var sheet = spreadsheet.getSheetByName(sheetName);
+  var headers = [
+    'ID', 'Ay', 'Tarih', 'Vardiya', 'Rol', 'Temizlik Alani',
+    'Planlanan Sorumlu', 'Yardimci Operator', 'Yapildi',
+    'Yapilma Zamani', 'Kaydeden', 'Vardiya ID', 'Kayit Tarihi'
+  ];
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    sheet.appendRow(headers);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#0f766e');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setHorizontalAlignment('center');
+    headerRange.setBorder(true, true, true, true, true, true, '#000000', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 90);
+    sheet.setColumnWidth(2, 90);
+    sheet.setColumnWidth(3, 100);
+    sheet.setColumnWidth(4, 80);
+    sheet.setColumnWidth(5, 130);
+    sheet.setColumnWidth(6, 230);
+    sheet.setColumnWidth(7, 170);
+    sheet.setColumnWidth(8, 170);
+    sheet.setColumnWidth(9, 80);
+    sheet.setColumnWidth(10, 150);
+    sheet.setColumnWidth(11, 150);
+    sheet.setColumnWidth(12, 90);
+    sheet.setColumnWidth(13, 150);
+  }
+
+  if (sheet.getLastRow() < 2) {
+    seedMonthlyCleaningRows(sheet, year, month);
+  } else {
+    normalizeMonthlyCleaningRows(sheet, year, month);
+  }
+
+  return sheet;
+}
+
+function seedMonthlyCleaningRows(sheet, year, month) {
+  var rows = [];
+  var daysInMonth = new Date(Number(year), Number(month), 0).getDate();
+  var monthText = String(month).padStart(2, '0') + '.' + year;
+  var tasks = getCleaningTaskDefinitions();
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    var dateText = String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
+    for (var i = 0; i < tasks.length; i++) {
+      var task = tasks[i];
+      rows.push([
+        year + String(month).padStart(2, '0') + String(day).padStart(2, '0') + '-' + task.vardiya + '-' + task.sort,
+        monthText,
+        dateText,
+        task.vardiya,
+        task.role,
+        task.area,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        ''
+      ]);
+    }
+  }
+
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, 13).setValues(rows);
+    var dataRange = sheet.getRange(2, 1, rows.length, 13);
+    dataRange.setHorizontalAlignment('center');
+    dataRange.setBorder(true, true, true, true, true, true, '#d1d5db', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(2, 6, rows.length, 1).setHorizontalAlignment('left');
+  }
+}
+
+function normalizeMonthlyCleaningRows(sheet, year, month) {
+  var rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).getDisplayValues();
+  var daysInMonth = new Date(Number(year), Number(month), 0).getDate();
+  var expectedCount = daysInMonth * getCleaningTaskDefinitions().length;
+  var needsNormalize = rows.length !== expectedCount;
+
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i][5] === 'Tuvalet/Banyo' || rows[i][5] === 'Soyunma Odasi ve Mutfak') {
+      needsNormalize = true;
+      break;
+    }
+  }
+
+  if (!needsNormalize) return;
+
+  var oldMap = {};
+  for (var r = 0; r < rows.length; r++) {
+    var key = rows[r][2] + '|' + rows[r][3] + '|' + rows[r][4] + '|' + rows[r][5];
+    oldMap[key] = rows[r];
+  }
+
+  var rebuilt = buildMonthlyCleaningRows(year, month, oldMap);
+  if (sheet.getLastRow() > 1) {
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).clearContent();
+  }
+  if (rebuilt.length) {
+    sheet.getRange(2, 1, rebuilt.length, 13).setValues(rebuilt);
+    var dataRange = sheet.getRange(2, 1, rebuilt.length, 13);
+    dataRange.setHorizontalAlignment('center');
+    dataRange.setBorder(true, true, true, true, true, true, '#d1d5db', SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(2, 6, rebuilt.length, 1).setHorizontalAlignment('left');
+  }
+}
+
+function buildMonthlyCleaningRows(year, month, oldMap) {
+  var rows = [];
+  var daysInMonth = new Date(Number(year), Number(month), 0).getDate();
+  var monthText = String(month).padStart(2, '0') + '.' + year;
+  var tasks = getCleaningTaskDefinitions();
+
+  for (var day = 1; day <= daysInMonth; day++) {
+    var dateText = String(day).padStart(2, '0') + '.' + String(month).padStart(2, '0') + '.' + year;
+    for (var i = 0; i < tasks.length; i++) {
+      var task = tasks[i];
+      var exact = oldMap ? oldMap[dateText + '|' + task.vardiya + '|' + task.role + '|' + task.area] : null;
+      var legacyA = oldMap ? oldMap[dateText + '|08-16|Ana Vardiya|Tuvalet/Banyo'] : null;
+      var legacyB = oldMap ? oldMap[dateText + '|08-16|Ana Vardiya|Soyunma Odasi ve Mutfak'] : null;
+      var preserved = exact || null;
+
+      if (!preserved && task.vardiya === '08-16' && task.role === 'Ana Vardiya') {
+        preserved = mergeLegacyCleaningRows(legacyA, legacyB);
+      }
+
+      rows.push([
+        year + String(month).padStart(2, '0') + String(day).padStart(2, '0') + '-' + task.vardiya + '-' + task.sort,
+        monthText,
+        dateText,
+        task.vardiya,
+        task.role,
+        task.area,
+        preserved ? preserved[6] : '',
+        preserved ? preserved[7] : '',
+        preserved ? preserved[8] : '',
+        preserved ? preserved[9] : '',
+        preserved ? preserved[10] : '',
+        preserved ? preserved[11] : '',
+        preserved ? preserved[12] : ''
+      ]);
+    }
+  }
+
+  return rows;
+}
+
+function mergeLegacyCleaningRows(rowA, rowB) {
+  if (!rowA && !rowB) return null;
+  var bothDone = (!rowA || rowA[8] === 'EVET') && (!rowB || rowB[8] === 'EVET');
+  var base = rowA || rowB;
+  var other = rowA && rowB ? rowB : null;
+  var merged = base.slice();
+  merged[8] = bothDone ? 'EVET' : '';
+  merged[9] = bothDone ? ((other && other[9]) || base[9] || '') : '';
+  merged[10] = (base[10] || (other && other[10]) || '');
+  merged[11] = (base[11] || (other && other[11]) || '');
+  merged[12] = (base[12] || (other && other[12]) || '');
+  return merged;
+}
+
+function getMonthlyCleaningList(year, month) {
+  try {
+    var now = new Date();
+    var targetYear = parseInt(year, 10) || now.getFullYear();
+    var targetMonth = parseInt(month, 10) || (now.getMonth() + 1);
+    var sheet = ensureCleaningSheet(targetYear, targetMonth);
+    var rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).getDisplayValues();
+    var data = rows.map(function(row) {
+      return {
+        id: row[0],
+        ay: row[1],
+        tarih: row[2],
+        vardiya: row[3],
+        rol: row[4],
+        alan: row[5],
+        sorumlu: row[6],
+        yardimciOperator: row[7],
+        yapildi: row[8],
+        yapilmaZamani: row[9],
+        kaydeden: row[10],
+        vardiyaId: row[11],
+        kayitTarihi: row[12]
+      };
+    });
+
+    return {
+      success: true,
+      sheetName: sheet.getName(),
+      year: targetYear,
+      month: targetMonth,
+      data: data
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function saveCleaningChecklist(data) {
+  try {
+    var tarih = formatDateTR(data.tarih || '');
+    if (!tarih) return { success: false, error: 'Tarih eksik' };
+
+    var dateParts = tarih.split('.');
+    var year = parseInt(dateParts[2], 10);
+    var month = parseInt(dateParts[1], 10);
+    var sheet = ensureCleaningSheet(year, month);
+    var vardiya = String(data.vardiya || '').trim();
+    var taskPayload = JSON.parse(data.tasks || '[]');
+    var taskMap = {};
+    for (var i = 0; i < taskPayload.length; i++) {
+      taskMap[String(taskPayload[i].role || '') + '|' + String(taskPayload[i].area || '')] = taskPayload[i];
+    }
+
+    if (sheet.getLastRow() < 2) {
+      return { success: false, error: 'Temizlik listesi bos' };
+    }
+
+    var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).getDisplayValues();
+    var updated = 0;
+    var nowText = formatDateTimeTR(new Date());
+
+    for (var row = 0; row < values.length; row++) {
+      if (values[row][2] !== tarih || values[row][3] !== vardiya) continue;
+
+      var key = values[row][4] + '|' + values[row][5];
+      if (!Object.prototype.hasOwnProperty.call(taskMap, key)) continue;
+
+      var task = taskMap[key];
+      var sheetRow = row + 2;
+      var responsible = values[row][4] === 'Yardimci Vardiya'
+        ? (data.yardimciOperator || data.personel || '')
+        : (data.personel || '');
+      sheet.getRange(sheetRow, 7).setValue(responsible);
+      sheet.getRange(sheetRow, 8).setValue(data.yardimciOperator || '');
+      sheet.getRange(sheetRow, 9).setValue(task.done ? 'EVET' : '');
+      sheet.getRange(sheetRow, 10).setValue(task.done ? (task.doneAt || nowText) : '');
+      sheet.getRange(sheetRow, 11).setValue(data.kaydeden || data.personel || '');
+      sheet.getRange(sheetRow, 12).setValue(data.vardiyaId || '');
+      sheet.getRange(sheetRow, 13).setValue(nowText);
+      updated++;
+    }
+
+    return {
+      success: true,
+      message: 'Temizlik kontrol listesi kaydedildi',
+      updatedCount: updated,
+      sheetName: sheet.getName()
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getCleaningChecklist(data) {
+  try {
+    var tarih = formatDateTR(data.tarih || '');
+    var vardiya = String(data.vardiya || '').trim();
+    var hasHelper = String(data.hasHelper || '').toLowerCase() === 'true';
+    var dateParts = tarih.split('.');
+    var year = parseInt(dateParts[2], 10);
+    var month = parseInt(dateParts[1], 10);
+    var sheet = ensureCleaningSheet(year, month);
+    var rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, 13).getDisplayValues();
+    var tasks = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][2] !== tarih || rows[i][3] !== vardiya) continue;
+      if (rows[i][4] === 'Yardimci Vardiya' && !hasHelper) continue;
+      tasks.push({
+        role: rows[i][4],
+        area: rows[i][5],
+        done: rows[i][8] === 'EVET',
+        doneAt: rows[i][9],
+        kaydeden: rows[i][10]
+      });
+    }
+
+    return { success: true, sheetName: sheet.getName(), data: tasks };
   } catch (error) {
     return { success: false, error: error.toString() };
   }

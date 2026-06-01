@@ -72,7 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(checkAutoRedirect, 60000); // Her 60 saniyede bir kontrol et
     
     // Vardiya Google Apps Script URL
-    const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4xRMYihfe_73NI-wMCvioTG6PrZilWAIBdA0n7dbJl6Nq9oJ-Va6IL-60_9OMNX3P/exec';
+    const VARDIYA_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygGjbmXyFU7jzsWpZS8DlyB6JDFTB8KG89wqNoh6Ha5g4bLun5krcgYGkaAEJq2IBV/exec';
     const VARDIYA_CONTROL_URLS = {
         saatlik: 'https://script.google.com/macros/s/AKfycbzzpkF4RJJ46d9A9518oxSwGaeuSgw-VHodQ5hjCApqb1H0FuIEnYNsqGOSdWXf9Yc/exec',
         motor: 'https://script.google.com/macros/s/AKfycbx0hVgnAIHSlaXAoFBc0-96SsMjb9R_GD3ptKlBBK7L_hjGFQBWqezV9w55X4MyZu3U/exec',
@@ -91,6 +91,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const islemKaydetBtn = document.getElementById('islemKaydetBtn');
     const vardiyaBitirBtn = document.getElementById('vardiyaBitirBtn');
     const devredenIslerInput = document.getElementById('devredenIsler');
+    const temizlikChecklist = document.getElementById('temizlikChecklist');
+    const temizlikGorevleri = document.getElementById('temizlikGorevleri');
+    const temizlikChecklistMeta = document.getElementById('temizlikChecklistMeta');
+    const temizlikSaveStatus = document.getElementById('temizlikSaveStatus');
+    const temizlikAySecimi = document.getElementById('temizlikAySecimi');
+    const temizlikAyYukleBtn = document.getElementById('temizlikAyYukleBtn');
+    const temizlikAylikTableBody = document.getElementById('temizlikAylikTableBody');
+    const temizlikAylikOzet = document.getElementById('temizlikAylikOzet');
+    const CLEANING_TASKS = [
+        { vardiya: '08-16', role: 'Ana Vardiya', area: 'Tuvalet/Banyo, Soyunma Odasi ve Mutfak' },
+        { vardiya: '08-16', role: 'Yardimci Vardiya', area: 'Hucre Odasi ve Merdivenleri', helperOnly: true },
+        { vardiya: '16-24', role: 'Ana Vardiya', area: 'Kontrol Odasi ve Koridor' },
+        { vardiya: '24-08', role: 'Ana Vardiya', area: 'Motor Dairesi' }
+    ];
     
     // Haftalık vardiya kayıtları elementleri
     const baslangicTarihInput = document.getElementById('baslangicTarih');
@@ -111,6 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Vardiya kayıtları için varsayılan tarih aralığı (son 30 gün)
     setDefaultDateRange();
+    setDefaultCleaningMonth();
+    loadMonthlyCleaningList();
 
     function formatDateTR(date) {
         const year = date.getFullYear();
@@ -164,6 +180,213 @@ document.addEventListener('DOMContentLoaded', function() {
         const mevcutVardiyaDiv = document.getElementById('mevcutVardiya');
         if (mevcutVardiyaDiv) {
             mevcutVardiyaDiv.style.display = 'none';
+        }
+        if (temizlikChecklist) {
+            temizlikChecklist.style.display = 'none';
+        }
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function getCleaningTasksForShift(vardiya, hasHelper) {
+        return CLEANING_TASKS.filter(task => task.vardiya === vardiya && (!task.helperOnly || hasHelper));
+    }
+
+    function getCleaningStorageKey(vardiya) {
+        return [
+            'vardiyaTemizlik',
+            vardiya.id || '',
+            normalizeDateText(vardiya.tarih || tarihInput.value),
+            vardiya.vardiya || vardiyaSelect.value
+        ].join(':');
+    }
+
+    function setCleaningStatus(text, state) {
+        if (!temizlikSaveStatus) return;
+        temizlikSaveStatus.textContent = text;
+        temizlikSaveStatus.className = 'temizlik-status' + (state ? ` ${state}` : '');
+    }
+
+    function readLocalCleaningState(vardiya) {
+        try {
+            return JSON.parse(localStorage.getItem(getCleaningStorageKey(vardiya)) || '{}');
+        } catch (error) {
+            return {};
+        }
+    }
+
+    function writeLocalCleaningState(vardiya, tasks) {
+        const state = {};
+        tasks.forEach(task => {
+            state[`${task.role}|${task.area}`] = {
+                done: !!task.done,
+                doneAt: task.doneAt || ''
+            };
+        });
+        localStorage.setItem(getCleaningStorageKey(vardiya), JSON.stringify(state));
+    }
+
+    function collectCleaningTasksFromDom(vardiya) {
+        const items = Array.from(temizlikGorevleri?.querySelectorAll('.temizlik-gorev-input') || []);
+        return items.map(item => ({
+            role: item.dataset.role || '',
+            area: item.dataset.area || '',
+            done: item.checked,
+            doneAt: item.checked ? (item.dataset.doneAt || new Date().toLocaleString('tr-TR')) : ''
+        }));
+    }
+
+    function hasCheckedCleaningTask() {
+        return Array.from(temizlikGorevleri?.querySelectorAll('.temizlik-gorev-input') || [])
+            .some(item => item.checked);
+    }
+
+    async function saveCleaningChecklist(vardiya) {
+        if (!vardiya || !temizlikGorevleri) return;
+        const tasks = collectCleaningTasksFromDom(vardiya);
+        writeLocalCleaningState(vardiya, tasks);
+        setCleaningStatus('Kaydediliyor...', '');
+
+        try {
+            const url = new URL(VARDIYA_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'saveCleaningChecklist');
+            url.searchParams.append('vardiyaId', vardiya.id || '');
+            url.searchParams.append('tarih', toIsoDateParam(vardiya.tarih));
+            url.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
+            url.searchParams.append('personel', vardiya.personelAdSoyad || '');
+            url.searchParams.append('yardimciOperator', vardiya.yardimciOperator?.adSoyad || '');
+            url.searchParams.append('kaydeden', vardiya.personelAdSoyad || 'Operator');
+            url.searchParams.append('tasks', JSON.stringify(tasks));
+
+            const response = await fetch(url);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Kayit basarisiz');
+
+            setCleaningStatus('Kaydedildi', 'saved');
+            loadMonthlyCleaningList();
+        } catch (error) {
+            console.error('Temizlik kayit hatasi:', error);
+            setCleaningStatus('Yerelde tutuldu', 'error');
+        }
+    }
+
+    async function renderCleaningChecklist(vardiya) {
+        if (!temizlikChecklist || !temizlikGorevleri || !vardiya) return;
+
+        const hasHelper = !!vardiya.yardimciOperator;
+        let tasks = getCleaningTasksForShift(vardiya.vardiya, hasHelper).map(task => ({ ...task, done: false, doneAt: '' }));
+        const localState = readLocalCleaningState(vardiya);
+        tasks = tasks.map(task => {
+            const saved = localState[`${task.role}|${task.area}`];
+            return saved ? { ...task, done: !!saved.done, doneAt: saved.doneAt || '' } : task;
+        });
+
+        try {
+            const url = new URL(VARDIYA_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'getCleaningChecklist');
+            url.searchParams.append('tarih', toIsoDateParam(vardiya.tarih));
+            url.searchParams.append('vardiya', vardiya.vardiya);
+            url.searchParams.append('hasHelper', String(hasHelper));
+            const response = await fetch(url);
+            const result = await response.json();
+            if (result.success && Array.isArray(result.data)) {
+                const remoteMap = new Map(result.data.map(item => [`${item.role}|${item.area}`, item]));
+                tasks = tasks.map(task => {
+                    const remote = remoteMap.get(`${task.role}|${task.area}`);
+                    return remote ? { ...task, done: !!remote.done, doneAt: remote.doneAt || task.doneAt } : task;
+                });
+            }
+        } catch (error) {
+            console.warn('Temizlik listesi okunamadi, yerel durum kullaniliyor.', error);
+        }
+
+        temizlikChecklistMeta.textContent = `${normalizeDateText(vardiya.tarih)} - ${vardiya.vardiya} temizlik gorevleri`;
+        temizlikGorevleri.innerHTML = tasks.map((task, index) => `
+            <label class="temizlik-gorev">
+                <input
+                    type="checkbox"
+                    class="temizlik-gorev-input"
+                    data-role="${escapeHtml(task.role)}"
+                    data-area="${escapeHtml(task.area)}"
+                    data-done-at="${escapeHtml(task.doneAt || '')}"
+                    ${task.done ? 'checked' : ''}
+                >
+                <span>
+                    <strong>${escapeHtml(task.area)}</strong>
+                    <span>${escapeHtml(task.role)}${task.doneAt ? ` - ${escapeHtml(task.doneAt)}` : ''}</span>
+                </span>
+            </label>
+        `).join('');
+
+        temizlikGorevleri.querySelectorAll('.temizlik-gorev-input').forEach(input => {
+            input.addEventListener('change', function() {
+                this.dataset.doneAt = this.checked ? new Date().toLocaleString('tr-TR') : '';
+                saveCleaningChecklist(vardiya);
+            });
+        });
+
+        temizlikChecklist.style.display = 'block';
+        setCleaningStatus(tasks.every(task => task.done) ? 'Tamamlandi' : 'Bekliyor', tasks.every(task => task.done) ? 'saved' : '');
+    }
+
+    function setDefaultCleaningMonth() {
+        if (!temizlikAySecimi) return;
+        const now = new Date();
+        temizlikAySecimi.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    async function loadMonthlyCleaningList() {
+        if (!temizlikAySecimi || !temizlikAylikTableBody) return;
+        const [year, month] = String(temizlikAySecimi.value || '').split('-');
+        if (!year || !month) return;
+
+        temizlikAylikTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:18px;">Temizlik listesi yukleniyor...</td></tr>';
+
+        try {
+            const url = new URL(VARDIYA_APPS_SCRIPT_URL);
+            url.searchParams.append('action', 'getMonthlyCleaningList');
+            url.searchParams.append('year', year);
+            url.searchParams.append('month', month);
+            const response = await fetch(url);
+            const result = await response.json();
+            if (!result.success) throw new Error(result.error || 'Liste yuklenemedi');
+
+            const rows = result.data || [];
+            const doneCount = rows.filter(row => row.yapildi === 'EVET').length;
+            if (temizlikAylikOzet) {
+                temizlikAylikOzet.textContent = `${result.sheetName}: ${rows.length} gorev, ${doneCount} tamamlandi`;
+            }
+
+            if (!rows.length) {
+                temizlikAylikTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:18px;">Bu ay icin temizlik kaydi yok.</td></tr>';
+                return;
+            }
+
+            temizlikAylikTableBody.innerHTML = rows.map(row => {
+                const done = row.yapildi === 'EVET';
+                return `
+                    <tr class="${done ? 'temizlik-done' : 'temizlik-pending'}">
+                        <td>${escapeHtml(row.tarih)}</td>
+                        <td>${escapeHtml(row.vardiya)}</td>
+                        <td>${escapeHtml(row.rol)}</td>
+                        <td>${escapeHtml(row.alan)}</td>
+                        <td>${escapeHtml(row.sorumlu || row.yardimciOperator || '-')}</td>
+                        <td><span class="durum-badge ${done ? 'done' : 'pending'}">${done ? 'Yapildi' : 'Bekliyor'}</span></td>
+                        <td>${escapeHtml(row.yapilmaZamani || '-')}</td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Aylik temizlik listesi hatasi:', error);
+            if (temizlikAylikOzet) temizlikAylikOzet.textContent = 'Liste yuklenemedi.';
+            temizlikAylikTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#991b1b; padding:18px;">${escapeHtml(error.message)}</td></tr>`;
         }
     }
 
@@ -384,11 +607,50 @@ document.addEventListener('DOMContentLoaded', function() {
             const mevcutVardiya = localStorage.getItem('mevcutVardiya');
             if (mevcutVardiya) {
                 const vardiya = JSON.parse(mevcutVardiya);
+                const pendingAciklamaInput = document.getElementById('islemAciklama');
+                const pendingAciklama = pendingAciklamaInput?.value.trim() || '';
+                const cleaningChecked = hasCheckedCleaningTask();
+                const hasSavedOperation = Array.isArray(vardiya.islemler) && vardiya.islemler.length > 0;
+
+                if (!pendingAciklama && !hasSavedOperation && !cleaningChecked) {
+                    alert('Vardiya bitirilemez. Lutfen islem aciklamasi girin veya temizlik yapildi tiklerinden en az birini isaretleyin!');
+                    return;
+                }
+
                 // Buton loading durumu
                 vardiyaBitirBtn.textContent = 'BİTİRİLİYOR...';
                 vardiyaBitirBtn.disabled = true;
                 
                 try {
+                    if (pendingAciklama) {
+                        const islemUrl = new URL(VARDIYA_APPS_SCRIPT_URL);
+                        islemUrl.searchParams.append('action', 'addIslem');
+                        islemUrl.searchParams.append('vardiyaId', vardiya.id);
+                        islemUrl.searchParams.append('islem', pendingAciklama);
+                        islemUrl.searchParams.append('zaman', new Date().toLocaleString('tr-TR'));
+                        islemUrl.searchParams.append('kaydeden', vardiya.personelAdSoyad || 'Operator');
+
+                        const islemResponse = await fetch(islemUrl);
+                        const islemResult = await islemResponse.json();
+                        if (!islemResult.success) {
+                            alert('Hata: ' + (islemResult.error || 'Islem aciklamasi kaydedilemedi!'));
+                            return;
+                        }
+
+                        if (!vardiya.islemler) vardiya.islemler = [];
+                        vardiya.islemler.push({
+                            islem: pendingAciklama,
+                            zaman: new Date().toLocaleString('tr-TR'),
+                            kaydeden: vardiya.personelAdSoyad || 'Operator'
+                        });
+                        localStorage.setItem('mevcutVardiya', JSON.stringify(vardiya));
+                        if (pendingAciklamaInput) pendingAciklamaInput.value = '';
+                    }
+
+                    if (cleaningChecked) {
+                        await saveCleaningChecklist(vardiya);
+                    }
+
                     const warnings = await runVardiyaClosePrecheck(vardiya);
                     if (warnings.length) {
                         const devam = confirm('Vardiya kapatma on kontrolunde uyarilar var:\n\n' + warnings.join('\n') + '\n\nYine de vardiya bitirilsin mi?');
@@ -415,6 +677,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (result.success) {
                         localStorage.removeItem('mevcutVardiya');
                         document.getElementById('mevcutVardiya').style.display = 'none';
+                        if (temizlikChecklist) temizlikChecklist.style.display = 'none';
                         personelSelect.value = '';
                         if (devredenIslerInput) devredenIslerInput.value = '';
                         operatorStatus.textContent = 'Personel seçiniz.';
@@ -595,6 +858,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // İşlem detaylarını göster
+    if (temizlikAyYukleBtn) {
+        temizlikAyYukleBtn.addEventListener('click', loadMonthlyCleaningList);
+    }
+
     async function islemDetaylariniGoster() {
         // Modal oluştur (loading ile)
         const modal = document.createElement('div');
@@ -803,6 +1070,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             mevcutVardiyaDiv.style.display = 'block';
+            renderCleaningChecklist(vardiya);
             
             // Formu doldur
             tarihInput.value = vardiya.tarih;
@@ -860,11 +1128,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const aciklama = islemAciklama.value.trim();
         const devredenIsler = devredenIslerInput?.value.trim() || '';
         
-        if (!aciklama && !devredenIsler) {
-            alert('Lütfen işlem açıklamasını girin!');
-            return;
-        }
-
         // Mevcut vardiya varsa işlemi kaydet
         const mevcutVardiya = localStorage.getItem('mevcutVardiya');
         if (!mevcutVardiya) {
@@ -873,32 +1136,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const vardiya = JSON.parse(mevcutVardiya);
+        const cleaningChecked = hasCheckedCleaningTask();
+
+        if (!aciklama && !cleaningChecked) {
+            alert('Lutfen islem aciklamasi girin veya temizlik yapildi tiklerinden en az birini isaretleyin!');
+            return;
+        }
         
         // Buton loading durumu
         islemKaydetmeBtn.textContent = 'KAYDEDİLİYOR...';
         islemKaydetmeBtn.disabled = true;
         
         try {
-            if (!aciklama && devredenIsler) {
-                const devredenUrl = new URL(VARDIYA_APPS_SCRIPT_URL);
-                devredenUrl.searchParams.append('action', 'updateDevredenIsler');
-                devredenUrl.searchParams.append('vardiyaId', vardiya.id);
-                devredenUrl.searchParams.append('tarih', toIsoDateParam(vardiya.tarih));
-                devredenUrl.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
-                devredenUrl.searchParams.append('devredenIsler', devredenIsler);
+            if (!aciklama && cleaningChecked) {
+                await saveCleaningChecklist(vardiya);
 
-                const devredenResponse = await fetch(devredenUrl);
-                const devredenResult = await devredenResponse.json();
+                if (devredenIsler) {
+                    const devredenUrl = new URL(VARDIYA_APPS_SCRIPT_URL);
+                    devredenUrl.searchParams.append('action', 'updateDevredenIsler');
+                    devredenUrl.searchParams.append('vardiyaId', vardiya.id);
+                    devredenUrl.searchParams.append('tarih', toIsoDateParam(vardiya.tarih));
+                    devredenUrl.searchParams.append('vardiya', vardiya.vardiya || vardiyaSelect.value);
+                    devredenUrl.searchParams.append('devredenIsler', devredenIsler);
 
-                if (devredenResult.success) {
+                    const devredenResponse = await fetch(devredenUrl);
+                    const devredenResult = await devredenResponse.json();
+
+                    if (!devredenResult.success) {
+                        alert('Hata: ' + (devredenResult.error || 'Devreden isler kaydedilemedi!'));
+                        return;
+                    }
+
                     vardiya.devredenIsler = devredenIsler;
                     localStorage.setItem('mevcutVardiya', JSON.stringify(vardiya));
-                    window.SystemAuditLog?.write?.('Vardiya devreden isi kaydedildi', devredenIsler.slice(0, 80), 'ok');
-                    alert('Devreden isler kaydedildi!');
-                    haftalikVardiyaKayitlariniGoster();
-                } else {
-                    alert('Hata: ' + (devredenResult.error || 'Devreden isler kaydedilemedi!'));
                 }
+
+                window.SystemAuditLog?.write?.('Vardiya temizlik kontrolu kaydedildi', vardiya.vardiya || '', 'ok');
+                alert('Temizlik kontrolu kaydedildi!');
+                haftalikVardiyaKayitlariniGoster();
                 return;
             }
 

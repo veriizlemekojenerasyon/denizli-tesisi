@@ -553,6 +553,172 @@ body {
 }
 
 /* Haftalık Vardiya Kayıtları */
+.temizlik-checklist,
+.temizlik-aylik-listesi {
+    background: #ffffff;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    padding: 22px;
+    margin: 24px 0;
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.08);
+}
+
+.temizlik-checklist-header,
+.temizlik-aylik-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.temizlik-checklist-header p,
+.temizlik-aylik-header p {
+    color: #64748b;
+    font-size: 14px;
+    margin-top: -10px;
+}
+
+.temizlik-status,
+.temizlik-summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.temizlik-status.saved {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.temizlik-status.error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.temizlik-gorevleri {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+}
+
+.temizlik-gorev {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.temizlik-gorev input {
+    width: 20px;
+    height: 20px;
+    margin-top: 2px;
+    accent-color: #0f766e;
+}
+
+.temizlik-gorev strong {
+    display: block;
+    color: #0f172a;
+    font-size: 14px;
+    margin-bottom: 3px;
+}
+
+.temizlik-gorev span {
+    color: #64748b;
+    font-size: 13px;
+}
+
+.temizlik-aylik-listesi {
+    background: linear-gradient(135deg, #ecfeff 0%, #f8fafc 100%);
+    border-color: #a5f3fc;
+}
+
+.temizlik-aylik-listesi .subsection-title {
+    border-left-color: #0f766e;
+}
+
+.temizlik-aylik-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.temizlik-aylik-controls input {
+    padding: 11px 14px;
+    border: 2px solid #dbeafe;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    background: #ffffff;
+}
+
+.temizlik-summary {
+    border-radius: 10px;
+    margin-bottom: 14px;
+}
+
+.temizlik-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.temizlik-table th {
+    background: linear-gradient(135deg, #0f766e 0%, #0e7490 100%);
+    color: white;
+    padding: 12px 14px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 13px;
+}
+
+.temizlik-table td {
+    padding: 11px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 13px;
+}
+
+.temizlik-table tr.temizlik-done {
+    background: #f0fdf4;
+}
+
+.temizlik-table tr.temizlik-pending {
+    background: #ffffff;
+}
+
+.temizlik-table .durum-badge {
+    display: inline-flex;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.temizlik-table .durum-badge.done {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.temizlik-table .durum-badge.pending {
+    background: #f1f5f9;
+    color: #475569;
+}
+
 .haftalik-vardiya-kayitlari {
     background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
     border-radius: 15px;
