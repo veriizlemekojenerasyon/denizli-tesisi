@@ -159,6 +159,16 @@ function saveEndOfDayValues(data, options) {
       .setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
     sheet.getRange(row, 4, 1, 3).setNumberFormat('0.00');
 
+    var mainEnergyResult = upsertMainEnergyEndOfDayRecord({
+      tarih: tarih,
+      saat: saat,
+      motor: motor,
+      toplamAktifEnerji: toplamAktifEnerji,
+      calismaSaati: calismaSaati,
+      kalkisSayisi: kalkisSayisi,
+      kaydeden: kaydeden,
+      kayitTarihi: kayitTarihi
+    });
     var yearlyResult = updateYearlyEnergyEndOfDayRow(motor, tarih, calismaSaati, toplamAktifEnerji);
 
     return {
@@ -168,12 +178,112 @@ function saveEndOfDayValues(data, options) {
       tarih: tarih,
       saat: saat,
       motor: motor,
+      mainEnergy: mainEnergyResult,
       yearly: yearlyResult,
       testMode: opts.enforceWindow === false
     };
   } catch (error) {
     return { success: false, error: error.toString() };
   }
+}
+
+function upsertMainEnergyEndOfDayRecord(data) {
+  try {
+    var motor = normalizeEnerjiMotorLabel(data.motor);
+    var sheet = getOrCreateMainEnergySheet(motor);
+    var rowValues = buildMainEnergyEndOfDayRow(data);
+    var targetRow = findMainEnergyRecordRow(sheet, data.tarih, data.saat);
+    var action = 'updated';
+
+    if (!targetRow) {
+      sheet.appendRow(rowValues);
+      targetRow = sheet.getLastRow();
+      action = 'inserted';
+    } else {
+      sheet.getRange(targetRow, 1, 1, rowValues.length).setValues([rowValues]);
+    }
+
+    formatMainEnergyRecordRow(sheet, targetRow);
+
+    return {
+      success: true,
+      action: action,
+      sheetName: sheet.getName(),
+      row: targetRow
+    };
+  } catch (error) {
+    return { success: false, error: error.toString() };
+  }
+}
+
+function getOrCreateMainEnergySheet(motor) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetName = 'Enerji ' + normalizeEnerjiMotorLabel(motor);
+  var sheet = spreadsheet.getSheetByName(sheetName);
+  var headers = [
+    'Tarih', 'Vardiya', 'Saat', 'Motor',
+    'L1-L2 AYDEM VOLTAJI', '(P) AKTIF GUC', '(Q) REAKTIF GUC', 'Cos Phi',
+    'ORT.AKIM', 'ORT.GERILIM', 'NOTR AKIMI', 'TAHRIK GERILIMI',
+    'TOPLAM AKTIF ENERJI', 'CALISMA SAATI', 'KALKIS SAYISI',
+    'Durum', 'Kaydeden', 'Kayit Tarihi'
+  ];
+
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setValues([headers])
+      .setFontWeight('bold')
+      .setBackground('#111827')
+      .setFontColor('#ffffff');
+    sheet.setFrozenRows(1);
+    sheet.getRange(2, 1, 1000, 4).setNumberFormat('@');
+    sheet.getRange(2, 5, 1000, 11).setNumberFormat('0.00');
+    sheet.getRange(2, 16, 1000, 3).setNumberFormat('@');
+  }
+
+  return sheet;
+}
+
+function buildMainEnergyEndOfDayRow(data) {
+  var zero = 0;
+  return [
+    data.tarih,
+    '24-08',
+    data.saat || '23:59',
+    normalizeEnerjiMotorLabel(data.motor),
+    zero, zero, zero, zero, zero, zero, zero, zero,
+    parseEnerjiNumber(data.toplamAktifEnerji),
+    parseEnerjiNumber(data.calismaSaati),
+    parseEnerjiNumber(data.kalkisSayisi),
+    'GUN SONU',
+    data.kaydeden || 'Admin',
+    data.kayitTarihi || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd.MM.yyyy HH:mm:ss')
+  ];
+}
+
+function findMainEnergyRecordRow(sheet, tarih, saat) {
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+
+  var normalizedDate = normalizeDateTR(tarih);
+  var normalizedSaat = String(saat || '23:59').trim();
+  var rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, 3).getDisplayValues();
+
+  for (var i = 0; i < rows.length; i++) {
+    if (normalizeDateTR(rows[i][0]) === normalizedDate &&
+        String(rows[i][2] || '').trim() === normalizedSaat) {
+      return i + 2;
+    }
+  }
+
+  return 0;
+}
+
+function formatMainEnergyRecordRow(sheet, row) {
+  sheet.getRange(row, 1, 1, 18)
+    .setHorizontalAlignment('center')
+    .setBorder(true, true, true, true, true, true, '#cccccc', SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(row, 5, 1, 11).setNumberFormat('0.00');
+  sheet.getRange(row, 16).setFontWeight('bold').setBackground('#d9ead3');
 }
 
 function getEndOfDayValues(params) {
